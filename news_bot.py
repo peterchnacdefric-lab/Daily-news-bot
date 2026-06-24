@@ -9,10 +9,11 @@ BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
 GROQ_KEY = os.environ["GROQ_KEY"]
 
-# Date du jour
-aujourd_hui = datetime.now().strftime("%d/%m/%Y")
+# Date formatée lisible
+now = datetime.now()
+date_complete = now.strftime("%A %d %B %Y")
 
-# Récupération Google News
+# Google News RSS
 url = "https://news.google.com/rss?hl=fr&gl=FR&ceid=FR:fr"
 response = requests.get(url)
 root = ET.fromstring(response.content)
@@ -26,89 +27,142 @@ texte_brut = "\n".join(articles)
 
 # PROMPT
 prompt = f"""
-Tu es un analyste de presse moderne spécialisé dans les formats Telegram.
-
-Tu transformes les Google News du jour en un flux d’actualités VISUEL, VARIÉ et FACILE À LIRE.
+Tu es un journaliste pédagogique spécialisé dans l’apprentissage du monde à travers les actualités.
 
 OBJECTIF :
-Créer un fil d’info comme une application news moderne sur mobile.
+Transformer les Google News du jour en un flux d’actualités simple, clair et compréhensible, puis enseigner les concepts importants en bas pour permettre à l’utilisateur d’apprendre progressivement la politique, la géopolitique et l’économie.
 
-RÈGLES ABSOLUES :
-- INTERDICTION de Markdown (aucun *, aucun #, aucun __, aucun code)
-- INTERDICTION de longs paragraphes
-- INTERDICTION de style article classique monotone
-- Texte directement lisible sur Telegram
-- Emojis OBLIGATOIRES mais légers et variés (pas répétitifs)
+DATE :
+{date_complete}
 
-FORMAT OBLIGATOIRE :
-Chaque news doit être un BLOC INDÉPENDANT.
+RÈGLES IMPORTANTES :
+- Aucun Markdown (interdiction totale de *, #, soulignements, code)
+- Style Telegram lisible (mobile)
+- News simples avec vocabulaire normal
+- Explications détaillées uniquement en bas
+- Emojis légers uniquement pour guider la lecture
+- Focus international + un peu France
 
-STRUCTURE DE CHAQUE BLOC :
+--------------------------------------------
+FORMAT DES NEWS (PARTIE 1)
+--------------------------------------------
 
-🧠 TITRE COURT (impactant, 6 à 12 mots max)
+Chaque news doit être un bloc :
 
-Ensuite 3 mini lignes maximum :
+🧠 TITRE (court et clair, 6 à 12 mots)
 
-1) Ce qui se passe :
-Explication simple mais pas trop courte (2-3 phrases max)
+📌 Ce qui se passe :
+Explication simple, 2 à 3 phrases max, vocabulaire normal
 
-2) Détail intéressant :
-Ajoute un élément concret ou contextuel :
+🔎 Détail intéressant :
+Un élément concret :
 - chiffre
-- acteur impliqué
-- enjeu caché
-- conséquence directe
-(1 à 2 phrases max)
+- acteur
+- décision politique
+- conséquence réelle
+1 à 2 phrases max
 
-3) Pourquoi c’est important :
+🌍 Pourquoi c’est important :
 1 phrase simple
 
-VARIATION OBLIGATOIRE :
-- Certaines news peuvent être économiques
-- D’autres politiques
-- D’autres géopolitiques
-- D’autres tech
-- Mélange naturel, pas de structure fixe visible
+--------------------------------------------
+SECTION FINALE OBLIGATOIRE
+--------------------------------------------
 
-SECTION TERMINALE DANS LE FLUX (PAS À PART) :
+🧭 APPRENDRE LE MONDE (EXPLICATION SIMPLE)
 
+Ici tu expliques TOUT ce qui est nécessaire pour comprendre les news du jour.
+
+IMPORTANT :
+- expliquer comme à un débutant total
+- langage très simple
+- 1 à 4 lignes max par concept
+
+Tu dois inclure uniquement les concepts présents dans les news du jour.
+
+STRUCTURE :
+
+🏛 POLITIQUE (EXPLICATION DE BASE)
+
+- Parlement :
+explique simplement ce que c’est et ce qu’il fait (vote des lois, contrôle du gouvernement)
+
+- Gouvernement :
+explique qu’il exécute les décisions et dirige le pays
+
+- Président :
+explique son rôle (chef de l’État, représentation, décisions importantes selon pays)
+
+- Premier ministre :
+explique qu’il dirige l’action du gouvernement
+
+- Démocratie :
+explique que le peuple vote pour choisir ses dirigeants
+
+🌍 ORGANISATIONS INTERNATIONALES
+
+- ONU :
+ce que c’est et son rôle dans le monde
+
+- OTAN :
+ce que c’est et son rôle militaire
+
+- Union européenne :
+ce que c’est et pourquoi les pays travaillent ensemble
+
+💰 ÉCONOMIE (SI PRÉSENT DANS LES NEWS)
+
+- inflation :
+augmentation générale des prix
+
+- taux d’intérêt :
+coût de l’argent
+
+- PIB :
+richesse d’un pays
+
+--------------------------------------------
 💡 IDÉE D’INVESTISSEMENT DU JOUR
+--------------------------------------------
 
 Une seule idée basée sur les news du jour.
-Peut être entreprise secteur ou tendance.
 
-Tu dois inclure :
-- lien direct avec l’actualité
-- explication simple
+Doit inclure :
+- lien avec actualité
 - opportunité
 - risques
+- explication simple
 
-Pas de conseil financier.
+Pas un conseil financier.
 
+--------------------------------------------
 ₿ CRYPTO DU JOUR
+--------------------------------------------
 
 - Bitcoin
 - Ethereum
-- tendances globales crypto
+- tendances crypto
 
-Explique simplement :
-- pourquoi ça bouge
-- événements (ETF régulation institutions hacks adoption)
+Explique :
+- mouvements récents
+- raisons
+- événements importants (ETF, régulation, institutions)
 
-FIN :
-
+--------------------------------------------
 📊 SYNTHÈSE FINALE (MAX 5 LIGNES)
+--------------------------------------------
 
 Résumé global du jour
-Tendance du monde (incertitude croissance tension etc)
+Tendance du monde
+Situation générale simple
 
-STYLE OBLIGATOIRE :
-- très visuel
-- très fluide
-- varié
-- naturel
-- comme un feed news moderne
-- accessible comme si on expliquait à un jeune de 10 ans + analyse adulte légère
+STYLE GLOBAL :
+- très pédagogique
+- fluide
+- simple
+- visuel
+- progression d’apprentissage
+- parfait pour Telegram mobile
 
 Voici les actualités du jour :
 {texte_brut}
@@ -124,7 +178,7 @@ completion = client.chat.completions.create(
 
 resume = completion.choices[0].message.content
 
-# Envoi Telegram (SANS Markdown pour éviter les astérisques)
+# Envoi Telegram
 def envoyer_message(texte):
     for i in range(0, len(texte), 4000):
         morceau = texte[i:i+4000]
@@ -136,4 +190,4 @@ def envoyer_message(texte):
             }
         )
 
-envoyer_message(f"🗞 Actualités du {aujourd_hui}\n\n{resume}")
+envoyer_message(resume)
