@@ -36,15 +36,15 @@ FORMAT :
 
 🧠 TITRE
 
-📌 Explication (5-8 lignes)
+📌 Explication (10-20 lignes)
 
-🧠 Apprentissage (simple)
+🧠 Apprentissage (simple mais detaille )
 
-🔎 Contexte (court)
+🔎 Contexte
 
-🔮 Projection (3 scénarios courts)
+🔮 Projection 
 
-💰 INVESTISSEMENT (1 idée liée)
+💰 INVESTISSEMENT (1 entreprise concrète avec la raison pourquoi)
 
 ₿ CRYPTO (analyse courte)
 
