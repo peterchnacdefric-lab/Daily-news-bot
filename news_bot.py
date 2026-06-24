@@ -12,7 +12,7 @@ GROQ_KEY = os.environ["GROQ_KEY"]
 # Date du jour
 aujourd_hui = datetime.now().strftime("%d/%m/%Y")
 
-# Récupère les news Google
+# Récupération Google News
 url = "https://news.google.com/rss?hl=fr&gl=FR&ceid=FR:fr"
 response = requests.get(url)
 root = ET.fromstring(response.content)
@@ -26,86 +26,105 @@ texte_brut = "\n".join(articles)
 
 # PROMPT
 prompt = f"""
-Tu es un analyste de presse et vulgarisateur.
+Tu es un analyste de presse moderne spécialisé dans les formats Telegram.
 
-Tu transformes les informations de Google News du jour en un briefing quotidien clair, visuel et facile à lire, comme si tu expliquais à une personne de 10 ans mais avec une analyse intelligente d’adulte.
+Tu transformes les Google News du jour en un flux d’actualités VISUEL, VARIÉ et FACILE À LIRE.
 
-Le résultat doit ressembler à un fil d’actualités simple et fluide.
+OBJECTIF :
+Créer un fil d’info comme une application news moderne sur mobile.
 
-RÈGLES IMPORTANTES :
-- Utilise des gros titres clairs pour chaque news
-- Mélange actualités internationales, France, Espagne et Europe selon l’importance
-- Pas de sections fixes obligatoires
-- Pas de structure rigide
-- Juste des titres + explications
-- Emojis autorisés mais légers et uniquement pour améliorer la lecture
-- Style adapté Telegram (lecture rapide, mobile)
-- Pas de symboles techniques visibles (pas d’astérisques, pas de hashtags, pas de Markdown)
+RÈGLES ABSOLUES :
+- INTERDICTION de Markdown (aucun *, aucun #, aucun __, aucun code)
+- INTERDICTION de longs paragraphes
+- INTERDICTION de style article classique monotone
+- Texte directement lisible sur Telegram
+- Emojis OBLIGATOIRES mais légers et variés (pas répétitifs)
 
-FORMAT POUR CHAQUE ACTUALITÉ :
+FORMAT OBLIGATOIRE :
+Chaque news doit être un BLOC INDÉPENDANT.
 
-GROS TITRE (court et clair avec éventuellement un emoji)
-Explication simple en 2 à 4 phrases maximum
-Pourquoi c’est important en 1 phrase
+STRUCTURE DE CHAQUE BLOC :
 
-Puis si un mot complexe apparaît :
+🧠 TITRE COURT (impactant, 6 à 12 mots max)
 
-TU DOIS COMPRENDRE :
-Explique simplement les mots importants comme OTAN ONU BCE Fed inflation taux d’intérêt PIB récession etc
-Chaque explication doit être très courte 1 à 3 lignes maximum comme pour un enfant de 10 ans
+Ensuite 3 mini lignes maximum :
 
-Ensuite, dans tout le flux des news :
+1) Ce qui se passe :
+Explication simple mais pas trop courte (2-3 phrases max)
 
-IDÉE D’INVESTISSEMENT DU JOUR :
-Propose une seule idée basée uniquement sur les actualités du jour
-Cela peut être une entreprise un secteur ou une tendance économique
-Explique :
-- pourquoi c’est lié aux news
-- pourquoi c’est intéressant
-- quels sont les risques
-Précise que ce n’est PAS un conseil financier mais une analyse éducative
+2) Détail intéressant :
+Ajoute un élément concret ou contextuel :
+- chiffre
+- acteur impliqué
+- enjeu caché
+- conséquence directe
+(1 à 2 phrases max)
 
-CRYPTO DU JOUR :
-Résume Bitcoin Ethereum et les principales cryptos
-Explique :
-- tendance générale du marché
-- événements importants (ETF régulation adoption institutions hacks)
-- causes des mouvements
+3) Pourquoi c’est important :
+1 phrase simple
 
-SYNTHÈSE FINALE :
-5 lignes maximum
-Résumé de la journée
-Tendance globale du monde
-Conclusion simple et claire
+VARIATION OBLIGATOIRE :
+- Certaines news peuvent être économiques
+- D’autres politiques
+- D’autres géopolitiques
+- D’autres tech
+- Mélange naturel, pas de structure fixe visible
 
-STYLE GLOBAL :
-- Très clair
-- Phrases courtes
-- Accessible
-- Pédagogique
-- Fluide comme un journal moderne
-- Optimisé pour lecture Telegram sur mobile
+SECTION TERMINALE DANS LE FLUX (PAS À PART) :
+
+💡 IDÉE D’INVESTISSEMENT DU JOUR
+
+Une seule idée basée sur les news du jour.
+Peut être entreprise secteur ou tendance.
+
+Tu dois inclure :
+- lien direct avec l’actualité
+- explication simple
+- opportunité
+- risques
+
+Pas de conseil financier.
+
+₿ CRYPTO DU JOUR
+
+- Bitcoin
+- Ethereum
+- tendances globales crypto
+
+Explique simplement :
+- pourquoi ça bouge
+- événements (ETF régulation institutions hacks adoption)
+
+FIN :
+
+📊 SYNTHÈSE FINALE (MAX 5 LIGNES)
+
+Résumé global du jour
+Tendance du monde (incertitude croissance tension etc)
+
+STYLE OBLIGATOIRE :
+- très visuel
+- très fluide
+- varié
+- naturel
+- comme un feed news moderne
+- accessible comme si on expliquait à un jeune de 10 ans + analyse adulte légère
 
 Voici les actualités du jour :
 {texte_brut}
 """
 
-# Résumé via Groq
+# Appel IA
 client = Groq(api_key=GROQ_KEY)
 completion = client.chat.completions.create(
     model="llama-3.3-70b-versatile",
-    messages=[
-        {
-            "role": "user",
-            "content": prompt
-        }
-    ],
+    messages=[{"role": "user", "content": prompt}],
     max_tokens=4000
 )
 
 resume = completion.choices[0].message.content
 
-# Envoi Telegram (sans Markdown pour éviter bugs)
+# Envoi Telegram (SANS Markdown pour éviter les astérisques)
 def envoyer_message(texte):
     for i in range(0, len(texte), 4000):
         morceau = texte[i:i+4000]
