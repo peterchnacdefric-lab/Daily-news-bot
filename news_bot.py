@@ -8,11 +8,11 @@ BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
 GROQ_KEY = os.environ["GROQ_KEY"]
 
-# Date complète
+# Date
 now = datetime.now()
 date_complete = now.strftime("%A %d %B %Y")
 
-# Google News RSS
+# Google News RSS (titre + contenu)
 url = "https://news.google.com/rss?hl=fr&gl=FR&ceid=FR:fr"
 response = requests.get(url)
 root = ET.fromstring(response.content)
@@ -24,68 +24,79 @@ for item in root.findall(".//item")[:25]:
 
 texte_brut = "\n".join(articles)
 
-# PROMPT SIMPLE ET ROBUSTE
+# PROMPT FINAL
 prompt = f"""
-Tu es un journaliste pédagogique et analyste du monde.
+Tu es un journaliste pédagogique et analyste du monde réel.
 
 DATE :
 {date_complete}
 
 MISSION :
-Transformer les news en un rapport clair, éducatif et structuré.
+Transformer les actualités en un rapport clair, éducatif et structuré.
 
-RÈGLES :
+RÈGLES IMPORTANTES :
+- INTERDICTION de créer des titres
+- Tu DOIS utiliser EXACTEMENT les titres fournis dans les news
 - Aucun Markdown
 - Style Telegram lisible
-- Explications simples mais informatives
-- Mélange international + France + Europe
+- Explications simples mais enrichissantes
+- Ajoute de la connaissance nouvelle dans chaque explication (apprentissage progressif)
 
 ------------------------------------
-FORMAT GLOBAL
+FORMAT OBLIGATOIRE
 ------------------------------------
-
-1) NEWS
 
 Pour chaque news :
 
-🧠 TITRE
+🧠 TITRE (copié exactement depuis la source, sans modification)
 
 📌 Explication :
-Explique la news clairement (5 à 10 lignes)
+- expliquer la news clairement (5 à 10 lignes)
+- ajouter du contexte réel pour comprendre l’événement
+- AJOUTER UN APPRENTISSAGE : chaque jour, inclure un élément éducatif lié (ex : comment fonctionne une institution, pourquoi une décision existe, comment un mécanisme économique marche)
+- rendre l’utilisateur plus intelligent sur le sujet, pas juste informé
 
-🔎 Termes et contexte :
-Explique ici les mots techniques ou le contexte (institutions, politique, économie, etc.)
-Rendre simple et compréhensible
+🔎 Contexte technique :
+- expliquer les termes compliqués présents dans la news
+- institutions, politiques, économie, géopolitique
+- expliquer simplement mais précisément
 
 🔮 Projections :
-Explique ce qui pourrait se passer ensuite
-Donne 2 à 3 scénarios possibles
+- 2 à 3 scénarios possibles
+- conséquences futures
+- risques ou opportunités
 
 ------------------------------------
-2) INVESTISSEMENT FINAL
-
-💰 Donne UNE seule entreprise à surveiller ou investir
-
-Inclure :
-- nom de l’entreprise
-- pourquoi elle est liée aux news
-- analyse simple
-- prix actuel de l’action (estimation si nécessaire ou récent connu)
-
-IMPORTANT : ce n’est pas un conseil financier
-
+💰 INVESTISSEMENT FINAL
 ------------------------------------
 
-3) SYNTHÈSE FINALE
-
-Résumé très court de la journée (max 5 lignes)
+- 1 seule entreprise liée aux news du jour
+- explication simple :
+  pourquoi elle est impactée
+  opportunité
+  risques
+- inclure prix de l’action (si connu ou estimation récente)
 
 ------------------------------------
+📊 SYNTHÈSE FINALE
+------------------------------------
+
+- résumé du jour
+- tendance globale
+- max 5 lignes
+
+------------------------------------
+IMPORTANT :
+- les titres doivent être identiques à ceux fournis
+- chaque explication doit apporter un apprentissage nouveau
+- pas de répétition
+- style pédagogique progressif
 
 NEWS :
 {texte_brut}
 """
 
+# IA
 client = Groq(api_key=GROQ_KEY)
 completion = client.chat.completions.create(
     model="llama-3.3-70b-versatile",
@@ -95,6 +106,7 @@ completion = client.chat.completions.create(
 
 resume = completion.choices[0].message.content
 
+# Telegram
 def send(text):
     for i in range(0, len(text), 4000):
         requests.post(
