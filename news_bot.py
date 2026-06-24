@@ -12,7 +12,7 @@ GROQ_KEY = os.environ["GROQ_KEY"]
 now = datetime.now()
 date_complete = now.strftime("%A %d %B %Y")
 
-# Google News RSS (titre + contenu)
+# Google News RSS
 url = "https://news.google.com/rss?hl=fr&gl=FR&ceid=FR:fr"
 response = requests.get(url)
 root = ET.fromstring(response.content)
@@ -24,23 +24,22 @@ for item in root.findall(".//item")[:25]:
 
 texte_brut = "\n".join(articles)
 
-# PROMPT FINAL
+# PROMPT
 prompt = f"""
-Tu es un journaliste pédagogique et analyste du monde réel.
+Tu es un journaliste analyste pédagogique expert.
 
 DATE :
 {date_complete}
 
 MISSION :
-Transformer les actualités en un rapport clair, éducatif et structuré.
+Transformer les actualités en un rapport quotidien très détaillé, clair et éducatif.
 
 RÈGLES IMPORTANTES :
-- INTERDICTION de créer des titres
-- Tu DOIS utiliser EXACTEMENT les titres fournis dans les news
-- Aucun Markdown
-- Style Telegram lisible
-- Explications simples mais enrichissantes
-- Ajoute de la connaissance nouvelle dans chaque explication (apprentissage progressif)
+- utiliser EXACTEMENT les titres fournis
+- aucun Markdown
+- style Telegram lisible
+- explications riches, pédagogiques et approfondies
+- chaque réponse doit faire apprendre quelque chose de nouveau
 
 ------------------------------------
 FORMAT OBLIGATOIRE
@@ -48,49 +47,74 @@ FORMAT OBLIGATOIRE
 
 Pour chaque news :
 
-🧠 TITRE (copié exactement depuis la source, sans modification)
+🧠 TITRE (identique à la source)
 
 📌 Explication :
-- expliquer la news clairement (5 à 10 lignes)
-- ajouter du contexte réel pour comprendre l’événement
-- AJOUTER UN APPRENTISSAGE : chaque jour, inclure un élément éducatif lié (ex : comment fonctionne une institution, pourquoi une décision existe, comment un mécanisme économique marche)
-- rendre l’utilisateur plus intelligent sur le sujet, pas juste informé
+- 8 à 12 lignes minimum
+- expliquer en détail le contexte de la news
+- expliquer les causes de l’événement
+- expliquer les acteurs impliqués
+- ajouter du contexte historique ou structurel quand utile
+- rendre compréhensible même pour quelqu’un qui découvre le sujet
+
+🧠 Apprentissage du jour (intégré dans l’explication) :
+- ajouter une notion éducative liée à la news
+- expliquer comment fonctionne une institution, un mécanisme économique, ou un concept politique
+- donner un exemple concret pour mieux comprendre
+- rendre la personne plus intelligente sur le sujet, pas juste informée
 
 🔎 Contexte technique :
-- expliquer les termes compliqués présents dans la news
+- expliquer les termes complexes présents dans la news
 - institutions, politiques, économie, géopolitique
-- expliquer simplement mais précisément
+- 3 à 6 lignes supplémentaires si nécessaire
 
 🔮 Projections :
-- 2 à 3 scénarios possibles
-- conséquences futures
-- risques ou opportunités
+- 3 à 5 lignes minimum
+- expliquer plusieurs scénarios possibles
+- scénario stable
+- scénario tendu
+- scénario extrême si pertinent
+- expliquer les conséquences concrètes pour le monde réel
 
 ------------------------------------
 💰 INVESTISSEMENT FINAL
 ------------------------------------
 
 - 1 seule entreprise liée aux news du jour
-- explication simple :
-  pourquoi elle est impactée
-  opportunité
-  risques
-- inclure prix de l’action (si connu ou estimation récente)
+- explication longue :
+  pourquoi cette entreprise est directement impactée
+  pourquoi elle est intéressante aujourd’hui
+  opportunités à court et moyen terme
+  risques importants
+- inclure prix de l’action (récent ou estimation si nécessaire)
+
+------------------------------------
+₿ CRYPTO DU JOUR
+------------------------------------
+
+- Bitcoin
+- Ethereum
+- marché crypto global
+
+Inclure :
+- analyse des mouvements récents
+- causes détaillées
+- événements majeurs (ETF, régulation, institutions, hacks, adoption)
 
 ------------------------------------
 📊 SYNTHÈSE FINALE
 ------------------------------------
 
-- résumé du jour
-- tendance globale
-- max 5 lignes
+- résumé global du jour
+- analyse de la tendance mondiale
+- 5 à 7 lignes
 
 ------------------------------------
 IMPORTANT :
-- les titres doivent être identiques à ceux fournis
-- chaque explication doit apporter un apprentissage nouveau
-- pas de répétition
-- style pédagogique progressif
+- profondeur maximale dans les explications
+- priorité à la compréhension réelle
+- style pédagogique mais sérieux
+- aucun résumé superficiel
 
 NEWS :
 {texte_brut}
