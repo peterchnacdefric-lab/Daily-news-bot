@@ -9,7 +9,7 @@ BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
 GROQ_KEY = os.environ["GROQ_KEY"]
 
-# Date formatée lisible
+# Date stable et identique tous les jours
 now = datetime.now()
 date_complete = now.strftime("%A %d %B %Y")
 
@@ -27,99 +27,101 @@ texte_brut = "\n".join(articles)
 
 # PROMPT
 prompt = f"""
-Tu es un journaliste pédagogique spécialisé dans l’apprentissage du monde à travers les actualités.
+Tu es un journaliste pédagogique et analyste géopolitique.
 
 OBJECTIF :
-Transformer les Google News du jour en un flux d’actualités simple, clair et compréhensible, puis enseigner les concepts importants en bas pour permettre à l’utilisateur d’apprendre progressivement la politique, la géopolitique et l’économie.
+Transformer les Google News du jour en un flux d’actualités clair, visuel et éducatif, avec analyse et projection future.
 
-DATE :
-{date_complete}
+DATE (OBLIGATOIRE EN PREMIÈRE LIGNE DU RÉSULTAT) :
+Journal du jour — {date_complete}
 
 RÈGLES IMPORTANTES :
 - Aucun Markdown (interdiction totale de *, #, soulignements, code)
-- Style Telegram lisible (mobile)
-- News simples avec vocabulaire normal
-- Explications détaillées uniquement en bas
-- Emojis légers uniquement pour guider la lecture
+- Style Telegram lisible
+- Vocabulaire simple dans les news
+- Analyse plus profonde uniquement dans les sections finales
+- Emojis légers uniquement pour structurer
 - Focus international + un peu France
 
 --------------------------------------------
-FORMAT DES NEWS (PARTIE 1)
+FORMAT DES NEWS
 --------------------------------------------
 
 Chaque news doit être un bloc :
 
-🧠 TITRE (court et clair, 6 à 12 mots)
+🧠 TITRE (court, clair, 6 à 12 mots)
 
 📌 Ce qui se passe :
-Explication simple, 2 à 3 phrases max, vocabulaire normal
+Explication simple, 2 à 3 phrases max
 
 🔎 Détail intéressant :
 Un élément concret :
 - chiffre
 - acteur
-- décision politique
-- conséquence réelle
+- décision
+- contexte important
 1 à 2 phrases max
 
 🌍 Pourquoi c’est important :
 1 phrase simple
 
+🔮 Projection / futur possible :
+Explique ce qui pourrait arriver ensuite :
+- scénario probable si ça continue
+- conséquences possibles
+- risques ou tensions futures
+2 à 4 phrases max
+
 --------------------------------------------
-SECTION FINALE OBLIGATOIRE
+SECTION APPRENTISSAGE
 --------------------------------------------
 
 🧭 APPRENDRE LE MONDE (EXPLICATION SIMPLE)
 
-Ici tu expliques TOUT ce qui est nécessaire pour comprendre les news du jour.
+Tu expliques les notions présentes dans les news.
 
-IMPORTANT :
-- expliquer comme à un débutant total
-- langage très simple
+RÈGLES :
+- très simple (niveau débutant)
 - 1 à 4 lignes max par concept
-
-Tu dois inclure uniquement les concepts présents dans les news du jour.
+- uniquement ce qui apparaît dans les news
 
 STRUCTURE :
 
-🏛 POLITIQUE (EXPLICATION DE BASE)
+🏛 POLITIQUE :
+Parlement :
+ce que c’est et son rôle
 
-- Parlement :
-explique simplement ce que c’est et ce qu’il fait (vote des lois, contrôle du gouvernement)
+Gouvernement :
+ce que c’est et son rôle
 
-- Gouvernement :
-explique qu’il exécute les décisions et dirige le pays
+Président :
+rôle selon les pays
 
-- Président :
-explique son rôle (chef de l’État, représentation, décisions importantes selon pays)
+Premier ministre :
+fonction principale
 
-- Premier ministre :
-explique qu’il dirige l’action du gouvernement
+Démocratie :
+définition simple
 
-- Démocratie :
-explique que le peuple vote pour choisir ses dirigeants
+🌍 ORGANISATIONS :
+ONU :
+rôle international
 
-🌍 ORGANISATIONS INTERNATIONALES
+OTAN :
+rôle militaire
 
-- ONU :
-ce que c’est et son rôle dans le monde
+Union européenne :
+coopération des pays
 
-- OTAN :
-ce que c’est et son rôle militaire
+💰 ÉCONOMIE :
+Inflation :
+explication simple
 
-- Union européenne :
-ce que c’est et pourquoi les pays travaillent ensemble
+Taux d’intérêt :
+explication simple
 
-💰 ÉCONOMIE (SI PRÉSENT DANS LES NEWS)
-
-- inflation :
-augmentation générale des prix
-
-- taux d’intérêt :
-coût de l’argent
-
-- PIB :
-richesse d’un pays
+PIB :
+explication simple
 
 --------------------------------------------
 💡 IDÉE D’INVESTISSEMENT DU JOUR
@@ -127,8 +129,8 @@ richesse d’un pays
 
 Une seule idée basée sur les news du jour.
 
-Doit inclure :
-- lien avec actualité
+Inclure :
+- lien avec l’actualité
 - opportunité
 - risques
 - explication simple
@@ -141,34 +143,34 @@ Pas un conseil financier.
 
 - Bitcoin
 - Ethereum
-- tendances crypto
+- tendances générales
 
-Explique :
+Inclure :
 - mouvements récents
 - raisons
-- événements importants (ETF, régulation, institutions)
+- événements (ETF régulation institutions adoption hacks)
 
 --------------------------------------------
 📊 SYNTHÈSE FINALE (MAX 5 LIGNES)
 --------------------------------------------
 
 Résumé global du jour
-Tendance du monde
-Situation générale simple
+Tendance mondiale
+Lecture simple de la situation
 
 STYLE GLOBAL :
-- très pédagogique
+- pédagogique
 - fluide
-- simple
 - visuel
 - progression d’apprentissage
-- parfait pour Telegram mobile
+- clair pour Telegram
+- cohérent tous les jours
 
 Voici les actualités du jour :
 {texte_brut}
 """
 
-# Appel IA
+# IA
 client = Groq(api_key=GROQ_KEY)
 completion = client.chat.completions.create(
     model="llama-3.3-70b-versatile",
@@ -178,7 +180,7 @@ completion = client.chat.completions.create(
 
 resume = completion.choices[0].message.content
 
-# Envoi Telegram
+# Telegram
 def envoyer_message(texte):
     for i in range(0, len(texte), 4000):
         morceau = texte[i:i+4000]
