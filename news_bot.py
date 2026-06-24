@@ -11,25 +11,55 @@ GROQ_KEY = os.environ["GROQ_KEY"]
 now = datetime.now()
 date_complete = now.strftime("%A %d %B %Y")
 
-# 🔁 REMPLACEMENT GOOGLE NEWS → LE MONDE
-rss_feeds = [
+# -----------------------------
+# SOURCES RSS
+# -----------------------------
+feeds = [
+    # Google News global
+    "https://news.google.com/rss?hl=fr&gl=FR&ceid=FR:fr",
+
+    # Le Monde
     "https://www.lemonde.fr/rss/une.xml",
     "https://www.lemonde.fr/international/rss_full.xml",
     "https://www.lemonde.fr/politique/rss_full.xml",
-    "https://www.lemonde.fr/economie/rss_full.xml"
+
+    # Le Parisien
+    "https://feeds.leparisien.fr/leparisien/rss",
+
+    # La Vanguardia (Espagne)
+    "https://www.lavanguardia.com/rss/home.xml",
+
+    # Le Dauphiné Libéré
+    "https://www.ledauphine.com/actualite/rss"
 ]
 
+# -----------------------------
+# EXTRACTION
+# -----------------------------
 articles = []
 
-for feed in rss_feeds:
-    response = requests.get(feed)
-    root = ET.fromstring(response.content)
-    for item in root.findall(".//item")[:5]:
-        titre = item.find("title").text
-        articles.append(titre)
+for feed in feeds:
+    try:
+        response = requests.get(feed, timeout=10)
+        root = ET.fromstring(response.content)
+
+        for item in root.findall(".//item")[:10]:
+            title = item.find("title").text
+
+            if title and title not in articles:
+                articles.append(title)
+
+    except:
+        continue
+
+# limite sécurité
+articles = articles[:30]
 
 texte_brut = "\n".join(articles)
 
+# -----------------------------
+# PROMPT IA
+# -----------------------------
 prompt = f"""
 Tu es un journaliste analyste pédagogique expert.
 
@@ -37,14 +67,14 @@ DATE :
 {date_complete}
 
 MISSION :
-Transformer les articles du Monde en un rapport quotidien détaillé, éducatif et structuré.
+Créer un rapport quotidien à partir de plusieurs sources internationales (France, Espagne, Europe, Google News).
 
 RÈGLES :
 - utiliser EXACTEMENT les titres fournis
 - aucun Markdown
 - style Telegram lisible
 - explications longues et pédagogiques
-- apprentissage intégré
+- apprentissage intégré dans chaque news
 
 FORMAT :
 
@@ -52,24 +82,24 @@ FORMAT :
 
 📌 Explication :
 8 à 12 lignes minimum
-contexte + causes + acteurs + enjeux
+(contexte + faits + acteurs + enjeux + explication simple)
 
 🧠 Apprentissage :
-explication pédagogique intégrée
+explication progressive pour comprendre le monde (institutions, économie, géopolitique)
 
 🔎 Contexte technique :
-institutions, politique, économie
+définitions des termes importants
 
-🔮 Projections :
-scénarios futurs détaillés
+🔮 Projection :
+3 scénarios possibles (stable / tension / crise)
 
 ------------------------------------
 
 💰 INVESTISSEMENT :
-1 entreprise liée aux news
+1 entreprise liée aux news du jour
 
 ₿ CRYPTO :
-analyse du marché
+analyse marché crypto
 
 📊 SYNTHÈSE :
 5 à 7 lignes
@@ -78,6 +108,9 @@ NEWS :
 {texte_brut}
 """
 
+# -----------------------------
+# IA
+# -----------------------------
 client = Groq(api_key=GROQ_KEY)
 completion = client.chat.completions.create(
     model="llama-3.3-70b-versatile",
@@ -87,6 +120,9 @@ completion = client.chat.completions.create(
 
 resume = completion.choices[0].message.content
 
+# -----------------------------
+# TELEGRAM
+# -----------------------------
 def send(text):
     for i in range(0, len(text), 4000):
         requests.post(
