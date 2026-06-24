@@ -3,115 +3,155 @@ import requests
 import xml.etree.ElementTree as ET
 from groq import Groq
 from datetime import datetime
+from collections import OrderedDict
+
+# =========================
+# CONFIG
+# =========================
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
 GROQ_KEY = os.environ["GROQ_KEY"]
 
+client = Groq(api_key=GROQ_KEY)
+
 now = datetime.now()
 date_complete = now.strftime("%A %d %B %Y")
 
-# -----------------------------
-# SOURCES RSS
-# -----------------------------
-feeds = [
-    # Google News global
-    "https://news.google.com/rss?hl=fr&gl=FR&ceid=FR:fr",
+# =========================
+# RSS SOURCES
+# =========================
 
-    # Le Monde
+feeds = [
+    "https://news.google.com/rss?hl=fr&gl=FR&ceid=FR:fr",
     "https://www.lemonde.fr/rss/une.xml",
     "https://www.lemonde.fr/international/rss_full.xml",
     "https://www.lemonde.fr/politique/rss_full.xml",
-
-    # Le Parisien
     "https://feeds.leparisien.fr/leparisien/rss",
-
-    # La Vanguardia (Espagne)
     "https://www.lavanguardia.com/rss/home.xml",
-
-    # Le Dauphiné Libéré
     "https://www.ledauphine.com/actualite/rss"
 ]
 
-# -----------------------------
-# EXTRACTION
-# -----------------------------
-articles = []
+# =========================
+# EXTRACTION ROBUSTE
+# =========================
+
+articles = OrderedDict()
+
+def extract_items(xml_content, feed_name):
+    """Support RSS + XML cassé + erreurs silencieuses"""
+    try:
+        root = ET.fromstring(xml_content)
+
+        # RSS classique
+        items = root.findall(".//item")
+
+        # fallback Atom
+        if not items:
+            items = root.findall(".//entry")
+
+        return items
+
+    except Exception as e:
+        print(f"❌ XML error sur {feed_name}: {e}")
+        return []
 
 for feed in feeds:
     try:
-        response = requests.get(feed, timeout=10)
-        root = ET.fromstring(response.content)
+        response = requests.get(
+            feed,
+            timeout=10,
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
 
-        for item in root.findall(".//item")[:10]:
-            title = item.find("title").text
+        if response.status_code != 200:
+            print(f"⚠️ HTTP error {response.status_code} sur {feed}")
+            continue
 
-            if title and title not in articles:
-                articles.append(title)
+        items = extract_items(response.content, feed)
 
-    except:
+        print(f"✅ {feed} → {len(items)} items")
+
+        for item in items[:20]:
+            title = item.find("title")
+
+            if title is not None:
+                title_text = title.text
+
+                if title_text and title_text not in articles:
+                    articles[title_text] = True
+
+    except Exception as e:
+        print(f"❌ Feed error {feed}: {e}")
         continue
 
-# limite sécurité
-articles = articles[:30]
+# =========================
+# LIMITATION INTELLIGENTE
+# =========================
 
-texte_brut = "\n".join(articles)
+articles_list = list(articles.keys())
 
-# -----------------------------
+print(f"🧾 Total articles collectés: {len(articles_list)}")
+
+articles_list = articles_list[:80]  # augmentation de capacité
+
+texte_brut = "\n".join(articles_list)
+
+# =========================
 # PROMPT IA
-# -----------------------------
+# =========================
+
 prompt = f"""
-Tu es un journaliste analyste pédagogique expert.
+Tu es un journaliste analyste expert.
 
 DATE :
 {date_complete}
 
 MISSION :
-Créer un rapport quotidien à partir de plusieurs sources internationales (France, Espagne, Europe, Google News).
+Créer un briefing mondial clair et pédagogique à partir de titres d'actualité.
 
 RÈGLES :
-- utiliser EXACTEMENT les titres fournis
-- aucun Markdown
-- style Telegram lisible
-- explications longues et pédagogiques
-- apprentissage intégré dans chaque news
+- utiliser uniquement les titres fournis
+- ne pas inventer de faits
+- style clair, pédagogique, structuré
+- explications simples mais riches
+- pas de Markdown
 
 FORMAT :
 
 🧠 TITRE
 
 📌 Explication :
-8 à 12 lignes minimum
-(contexte + faits + acteurs + enjeux + explication simple)
+(8-12 lignes minimum)
 
 🧠 Apprentissage :
-explication progressive pour comprendre le monde (institutions, économie, géopolitique)
+(comprendre le contexte mondial)
 
 🔎 Contexte technique :
-définitions des termes importants
+(définitions simples)
 
 🔮 Projection :
-3 scénarios possibles (stable / tension / crise)
+(stable / tension / crise)
 
 ------------------------------------
 
 💰 INVESTISSEMENT :
-1 entreprise liée aux news du jour
+1 entreprise liée à l’actualité
 
 ₿ CRYPTO :
-analyse marché crypto
+analyse générale du marché
 
 📊 SYNTHÈSE :
-5 à 7 lignes
+5-7 lignes
 
 NEWS :
 {texte_brut}
 """
 
-# -----------------------------
-# IA
-# -----------------------------
-client = Groq(api_key=GROQ_KEY)
+# =========================
+# IA CALL
+# =========================
+
 completion = client.chat.completions.create(
     model="llama-3.3-70b-versatile",
     messages=[{"role": "user", "content": prompt}],
@@ -120,14 +160,24 @@ completion = client.chat.completions.create(
 
 resume = completion.choices[0].message.content
 
-# -----------------------------
-# TELEGRAM
-# -----------------------------
-def send(text):
-    for i in range(0, len(text), 4000):
-        requests.post(
-            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            json={"chat_id": CHAT_ID, "text": text[i:i+4000]}
-        )
+# =========================
+# TELEGRAM SENDER ROBUSTE
+# =========================
 
-send(resume)
+def send_message(text):
+    chunks = [text[i:i+3500] for i in range(0, len(text), 3500)]
+
+    for chunk in chunks:
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                json={
+                    "chat_id": CHAT_ID,
+                    "text": chunk
+                },
+                timeout=10
+            )
+        except Exception as e:
+            print("❌ Telegram error:", e)
+
+send_message(resume)
