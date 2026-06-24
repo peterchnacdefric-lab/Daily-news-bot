@@ -2,11 +2,15 @@ import os
 import requests
 import xml.etree.ElementTree as ET
 from groq import Groq
+from datetime import datetime
 
 # Configuration
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
 GROQ_KEY = os.environ["GROQ_KEY"]
+
+# Date du jour
+aujourd_hui = datetime.now().strftime("%d/%m/%Y")
 
 # Récupère les news Google
 url = "https://news.google.com/rss?hl=fr&gl=FR&ceid=FR:fr"
@@ -14,11 +18,71 @@ response = requests.get(url)
 root = ET.fromstring(response.content)
 
 articles = []
-for item in root.findall(".//item")[:10]:
+for item in root.findall(".//item")[:20]:
     titre = item.find("title").text
     articles.append(titre)
 
 texte_brut = "\n".join(articles)
+
+# Prompt
+prompt = f"""📅 {aujourd_hui}
+
+Soyez mon analyste d'actualités quotidien. Aujourd'hui est le {aujourd_hui}.
+
+Présentez-moi les 8 actualités les plus importantes au monde de manière claire et structurée.
+
+⚠️ RÈGLES CLÉS :
+- Utilisez un langage technique lorsque nécessaire, MAIS expliquez toujours les termes complexes simplement.
+- Ne présumez pas de connaissances préalables.
+- Si un concept important apparaît pour la première fois dans le rapport (OTAN, ONU, BCE, Fed, etc.), expliquez-le brièvement une seule fois.
+- Ne répétez pas les explications déjà données dans d'autres articles.
+
+Pour chaque actualité :
+
+📰 TITRE
+(clair et direct)
+
+📌 RÉSUMÉ
+Explication claire et détaillée, avec quelques analyses, tout en restant compréhensible
+
+🌍 CONTEXTE
+- Personnes impliquées (le cas échéant)
+- Relations entre les acteurs
+- Contexte de base minimal
+
+📈 SCÉNARIOS FUTURS (POINTS CLÉS)
+3 scénarios :
+- Risque faible (situation résolue)
+- Risque intermédiaire (tensions persistantes)
+- Risque élevé (escalade)
+Expliquez les conditions qui pourraient déclencher chaque scénario.
+
+💡 EXPLICATION SIMPLE
+Résumez l'idée comme si vous l'expliquiez à une personne sans formation spécifique.
+
+---
+
+📊 BITCOIN
+- Résumé de la situation actuelle
+- Tendance
+- Scénarios possibles et facteurs d'influence
+
+---
+
+💼 IDÉE DU JOUR (INVESTISSEMENT ÉDUCATIF)
+- Entreprise concernée
+- Activité
+- Importance actuelle
+- Risques
+
+IMPORTANT : Ceci n'est pas un conseil financier, mais une analyse à visée pédagogique.
+
+---
+
+STYLE : Clair, structuré, légèrement technique mais toujours expliqué, sans répétitions, et axé sur une compréhension rapide.
+
+Voici les actualités du jour à analyser :
+{texte_brut}"""
 
 # Résumé via Groq
 client = Groq(api_key=GROQ_KEY)
@@ -27,20 +91,25 @@ completion = client.chat.completions.create(
     messages=[
         {
             "role": "user",
-            "content": f"Résume ces actualités du jour en français de façon claire et concise, avec des emojis :\n\n{texte_brut}"
+            "content": prompt
         }
-    ]
+    ],
+    max_tokens=4000
 )
 
 resume = completion.choices[0].message.content
 
-# Envoie sur Telegram
-message = f"🗞 *Actualités du jour*\n\n{resume}"
-requests.post(
-    f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-    json={
-        "chat_id": CHAT_ID,
-        "text": message,
-        "parse_mode": "Markdown"
-    }
-)
+# Découpe en morceaux si trop long pour Telegram
+def envoyer_message(texte):
+    for i in range(0, len(texte), 4000):
+        morceau = texte[i:i+4000]
+        requests.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+            json={
+                "chat_id": CHAT_ID,
+                "text": morceau,
+                "parse_mode": "Markdown"
+            }
+        )
+
+envoyer_message(f"🗞 *Actualités du {aujourd_hui}*\n\n{resume}")
