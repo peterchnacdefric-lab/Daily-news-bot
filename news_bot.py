@@ -8,23 +8,28 @@ BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
 GROQ_KEY = os.environ["GROQ_KEY"]
 
-# Date
 now = datetime.now()
 date_complete = now.strftime("%A %d %B %Y")
 
-# Google News RSS
-url = "https://news.google.com/rss?hl=fr&gl=FR&ceid=FR:fr"
-response = requests.get(url)
-root = ET.fromstring(response.content)
+# 🔁 REMPLACEMENT GOOGLE NEWS → LE MONDE
+rss_feeds = [
+    "https://www.lemonde.fr/rss/une.xml",
+    "https://www.lemonde.fr/international/rss_full.xml",
+    "https://www.lemonde.fr/politique/rss_full.xml",
+    "https://www.lemonde.fr/economie/rss_full.xml"
+]
 
 articles = []
-for item in root.findall(".//item")[:25]:
-    titre = item.find("title").text
-    articles.append(titre)
+
+for feed in rss_feeds:
+    response = requests.get(feed)
+    root = ET.fromstring(response.content)
+    for item in root.findall(".//item")[:5]:
+        titre = item.find("title").text
+        articles.append(titre)
 
 texte_brut = "\n".join(articles)
 
-# PROMPT
 prompt = f"""
 Tu es un journaliste analyste pédagogique expert.
 
@@ -32,95 +37,47 @@ DATE :
 {date_complete}
 
 MISSION :
-Transformer les actualités en un rapport quotidien très détaillé, clair et éducatif.
+Transformer les articles du Monde en un rapport quotidien détaillé, éducatif et structuré.
 
-RÈGLES IMPORTANTES :
+RÈGLES :
 - utiliser EXACTEMENT les titres fournis
 - aucun Markdown
 - style Telegram lisible
-- explications riches, pédagogiques et approfondies
-- chaque réponse doit faire apprendre quelque chose de nouveau
+- explications longues et pédagogiques
+- apprentissage intégré
 
-------------------------------------
-FORMAT OBLIGATOIRE
-------------------------------------
+FORMAT :
 
-Pour chaque news :
-
-🧠 TITRE (identique à la source)
+🧠 TITRE
 
 📌 Explication :
-- 8 à 12 lignes minimum
-- expliquer en détail le contexte de la news
-- expliquer les causes de l’événement
-- expliquer les acteurs impliqués
-- ajouter du contexte historique ou structurel quand utile
-- rendre compréhensible même pour quelqu’un qui découvre le sujet
+8 à 12 lignes minimum
+contexte + causes + acteurs + enjeux
 
-🧠 Apprentissage du jour (intégré dans l’explication) :
-- ajouter une notion éducative liée à la news
-- expliquer comment fonctionne une institution, un mécanisme économique, ou un concept politique
-- donner un exemple concret pour mieux comprendre
-- rendre la personne plus intelligente sur le sujet, pas juste informée
+🧠 Apprentissage :
+explication pédagogique intégrée
 
 🔎 Contexte technique :
-- expliquer les termes complexes présents dans la news
-- institutions, politiques, économie, géopolitique
-- 3 à 6 lignes supplémentaires si nécessaire
+institutions, politique, économie
 
 🔮 Projections :
-- 3 à 5 lignes minimum
-- expliquer plusieurs scénarios possibles
-- scénario stable
-- scénario tendu
-- scénario extrême si pertinent
-- expliquer les conséquences concrètes pour le monde réel
+scénarios futurs détaillés
 
 ------------------------------------
-💰 INVESTISSEMENT FINAL
-------------------------------------
 
-- 1 seule entreprise liée aux news du jour
-- explication longue :
-  pourquoi cette entreprise est directement impactée
-  pourquoi elle est intéressante aujourd’hui
-  opportunités à court et moyen terme
-  risques importants
-- inclure prix de l’action (récent ou estimation si nécessaire)
+💰 INVESTISSEMENT :
+1 entreprise liée aux news
 
-------------------------------------
-₿ CRYPTO DU JOUR
-------------------------------------
+₿ CRYPTO :
+analyse du marché
 
-- Bitcoin
-- Ethereum
-- marché crypto global
-
-Inclure :
-- analyse des mouvements récents
-- causes détaillées
-- événements majeurs (ETF, régulation, institutions, hacks, adoption)
-
-------------------------------------
-📊 SYNTHÈSE FINALE
-------------------------------------
-
-- résumé global du jour
-- analyse de la tendance mondiale
-- 5 à 7 lignes
-
-------------------------------------
-IMPORTANT :
-- profondeur maximale dans les explications
-- priorité à la compréhension réelle
-- style pédagogique mais sérieux
-- aucun résumé superficiel
+📊 SYNTHÈSE :
+5 à 7 lignes
 
 NEWS :
 {texte_brut}
 """
 
-# IA
 client = Groq(api_key=GROQ_KEY)
 completion = client.chat.completions.create(
     model="llama-3.3-70b-versatile",
@@ -130,7 +87,6 @@ completion = client.chat.completions.create(
 
 resume = completion.choices[0].message.content
 
-# Telegram
 def send(text):
     for i in range(0, len(text), 4000):
         requests.post(
