@@ -9,7 +9,7 @@ BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
 GROQ_KEY = os.environ["GROQ_KEY"]
 
-# Date format fixe en français
+# Date format fixe
 now = datetime.now()
 date_complete = now.strftime("%A %d %B %Y")
 
@@ -19,7 +19,7 @@ response = requests.get(url)
 root = ET.fromstring(response.content)
 
 articles = []
-for item in root.findall(".//item")[:20]:
+for item in root.findall(".//item")[:25]:
     titre = item.find("title").text
     articles.append(titre)
 
@@ -27,64 +27,67 @@ texte_brut = "\n".join(articles)
 
 # PROMPT
 prompt = f"""
-Tu es un journaliste analyste et pédagogue spécialisé dans la compréhension du monde réel.
+Tu es un journaliste analyste pédagogique spécialisé dans l’explication du monde moderne à travers les actualités.
 
 OBJECTIF :
-Transformer Google News en un rapport quotidien structuré, fluide et pédagogique adapté à Telegram.
+Créer un flux quotidien Telegram très lisible, varié, éducatif et structuré, permettant à l’utilisateur de comprendre ET apprendre progressivement le monde.
 
 DATE OBLIGATOIRE EN PREMIÈRE LIGNE :
 {date_complete}
 
-RÈGLES GÉNÉRALES :
-- Aucun Markdown (interdiction totale de *, #, soulignements ou code)
-- Format Telegram lisible (mobile)
-- Texte fluide, structuré avec titres
-- Emojis légers uniquement pour structurer les sections
-- Mélange international + France + Europe selon pertinence
-- Pas de listes rigides répétitives
+RÈGLES IMPORTANTES :
+- Aucun Markdown (interdiction stricte de *, #, code, soulignement)
+- Style Telegram mobile fluide
+- Beaucoup de variété dans les titres
+- Chaque titre DOIT avoir un emoji différent et pertinent
+- Mélange international, Europe, France, économie, tech, géopolitique
+- Pas de répétition de structure mécanique
 
 --------------------------------------------
-STRUCTURE OBLIGATOIRE
+STRUCTURE DES NEWS
 --------------------------------------------
 
-Chaque sujet doit être présenté sous forme de TITRE PRINCIPAL (gros titre clair).
+Chaque news doit être un bloc indépendant avec :
 
-Sous chaque titre :
+🎯 TITRE AVEC EMOJI (obligatoire, différent à chaque fois, adapté au sujet)
 
-1) EXPLICATION DES FAITS (5 à 10 lignes maximum)
-- Explication claire et naturelle
-- Style journal simple mais informatif
-- Pas de séparation artificielle
+📌 Ce qui se passe :
+5 à 8 lignes maximum
+- explication claire
+- vocabulaire simple mais pas simplifié à l’extrême
+- contexte important inclus naturellement
 
-2) 🧠 COMPRENDRE LES TERMES IMPORTANTs
-- uniquement si des termes techniques apparaissent dans cette news
-- expliquer dans le flux directement
-- politique, économie, géopolitique, institutions
-- explication simple intégrée dans le texte (pas de bloc séparé)
-- style pédagogique très simple
+🧠 COMPRENDRE LE CONTEXTE ET LES TERMES :
+- explication intégrée dans le texte (pas de bloc séparé)
+- expliquer les institutions, acteurs, concepts si présents
+- ajouter du contexte géopolitique ou économique
+- donner du sens global (pourquoi ça existe, comment ça fonctionne)
+- style pédagogique naturel, comme un professeur dans une conversation
 
-3) 🔮 PROJECTION
-- ce qui pourrait arriver ensuite
-- conséquences possibles
-- risques ou évolution probable
-- 2 à 4 phrases max
+🔮 PROJECTION :
+- ce qui peut se passer ensuite
+- scénarios possibles
+- tensions ou opportunités futures
+- conséquences concrètes
+2 à 4 phrases max
+
+IMPORTANT :
+- ne pas répéter les mêmes types de titres
+- varier fortement les sujets et les angles
+- chaque news doit être unique dans sa construction
 
 --------------------------------------------
-SECTION INVESTISSEMENT (EN FIN DE RAPPORT)
+💰 INVESTISSEMENT DU JOUR (FIN DU RAPPORT)
 --------------------------------------------
 
-💰 INVESTISSEMENT DU JOUR
-
-- une seule entreprise concrète
-- liée directement aux actualités du jour
+- 1 entreprise concrète uniquement
+- liée directement à une ou plusieurs actualités du jour
 - explication simple :
-  pourquoi cette entreprise est intéressante aujourd’hui
-  quelles opportunités
-  quels risques
+  pourquoi elle est impactée
+  opportunité potentielle
+  risques
 
-Important :
-- ce n’est pas un conseil financier
-- analyse éducative
+Pas un conseil financier, analyse éducative.
 
 --------------------------------------------
 ₿ CRYPTO DU JOUR
@@ -95,26 +98,27 @@ Important :
 - marché crypto global
 
 Inclure :
-- tendances actuelles
+- tendances du jour
 - raisons des mouvements
-- événements importants (ETF, régulation, adoption, institutions)
+- événements importants (ETF, régulation, adoption, institutions, hacks)
 
 --------------------------------------------
 📊 SYNTHÈSE FINALE (MAX 5 LIGNES)
 --------------------------------------------
 
 - résumé global du jour
-- tendance mondiale
+- tendances mondiales
 - lecture simple de la situation
 
 --------------------------------------------
 STYLE GLOBAL :
-- très fluide
-- très lisible Telegram
+- très visuel
+- très varié
 - pédagogique progressif
-- pas de répétition
-- compréhension + apprentissage intégré dans le flux
-- emojis uniquement pour titres et sections (pas dans le texte explicatif)
+- compréhension + apprentissage intégré
+- fluide pour Telegram mobile
+- aucune structure répétitive visible
+- chaque news doit sembler unique
 
 Voici les actualités du jour :
 {texte_brut}
@@ -130,7 +134,7 @@ completion = client.chat.completions.create(
 
 resume = completion.choices[0].message.content
 
-# Envoi Telegram
+# Telegram send
 def envoyer_message(texte):
     for i in range(0, len(texte), 4000):
         morceau = texte[i:i+4000]
