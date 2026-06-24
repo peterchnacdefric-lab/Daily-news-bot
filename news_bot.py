@@ -8,79 +8,81 @@ BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
 GROQ_KEY = os.environ["GROQ_KEY"]
 
+# Date complète
 now = datetime.now()
 date_complete = now.strftime("%A %d %B %Y")
 
+# Google News RSS
 url = "https://news.google.com/rss?hl=fr&gl=FR&ceid=FR:fr"
 response = requests.get(url)
 root = ET.fromstring(response.content)
 
 articles = []
-for item in root.findall(".//item")[:40]:
+for item in root.findall(".//item")[:25]:
     titre = item.find("title").text
     articles.append(titre)
 
 texte_brut = "\n".join(articles)
 
+# PROMPT SIMPLE ET ROBUSTE
 prompt = f"""
-Tu es un journaliste pédagogique.
+Tu es un journaliste pédagogique et analyste du monde.
 
 DATE :
 {date_complete}
 
 MISSION :
-Créer EXACTEMENT 10 news (pas plus, pas moins).
+Transformer les news en un rapport clair, éducatif et structuré.
 
-RÈGLES STRICTES :
-- 10 news obligatoires
-- chaque news a un emoji différent
-- aucun Markdown
-- format Telegram simple
-- news internationales + France + Europe
+RÈGLES :
+- Aucun Markdown
+- Style Telegram lisible
+- Explications simples mais informatives
+- Mélange international + France + Europe
 
-FORMAT POUR CHAQUE NEWS :
+------------------------------------
+FORMAT GLOBAL
+------------------------------------
 
-🎯 TITRE (emoji obligatoire unique)
+1) NEWS
+
+Pour chaque news :
+
+🧠 TITRE
 
 📌 Explication :
-5 à 8 lignes max, simple mais informatif
+Explique la news clairement (5 à 10 lignes)
 
-🔮 Projection :
-2 à 4 lignes sur le futur possible
+🔎 Termes et contexte :
+Explique ici les mots techniques ou le contexte (institutions, politique, économie, etc.)
+Rendre simple et compréhensible
 
----
+🔮 Projections :
+Explique ce qui pourrait se passer ensuite
+Donne 2 à 3 scénarios possibles
 
-IMPORTANT :
-Tu dois produire 10 blocs complets.
+------------------------------------
+2) INVESTISSEMENT FINAL
+
+💰 Donne UNE seule entreprise à surveiller ou investir
+
+Inclure :
+- nom de l’entreprise
+- pourquoi elle est liée aux news
+- analyse simple
+- prix actuel de l’action (estimation si nécessaire ou récent connu)
+
+IMPORTANT : ce n’est pas un conseil financier
 
 ------------------------------------
 
-🧠 APPRENDRE LE MONDE (long)
+3) SYNTHÈSE FINALE
 
-- minimum 12 lignes
-- paragraphes séparés
-- expliquer politique, économie, relations internationales
-- expliquer le fonctionnement du monde à partir des news
-- très pédagogique
+Résumé très court de la journée (max 5 lignes)
 
 ------------------------------------
 
-💰 INVESTISSEMENT :
-1 entreprise liée aux news
-
-------------------------------------
-
-₿ CRYPTO :
-marché crypto actuel
-
-------------------------------------
-
-📊 SYNTHÈSE :
-max 5 lignes
-
-------------------------------------
-
-NEWS INPUT :
+NEWS :
 {texte_brut}
 """
 
