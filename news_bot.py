@@ -23,8 +23,7 @@ texte_brut = "\n".join(articles)
 # Résumé via Groq
 client = Groq(api_key=GROQ_KEY)
 completion = client.chat.completions.create(
-    model=model="llama-3.3-70b-versatile",
-,
+    model="llama-3.3-70b-versatile",
     messages=[
         {
             "role": "user",
