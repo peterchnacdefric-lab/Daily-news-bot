@@ -17,7 +17,7 @@ def send(text):
         time.sleep(0.5)
 
 def sep(titre):
-    return f"\n\n{'─'*35}\n◆ {titre}\n{'─'*35}\n\n"
+    return f"\n\n{'═'*35}\n{titre}\n{'═'*35}\n\n"
 
 def groq_call(prompt, tokens=2000):
     time.sleep(3)
@@ -90,95 +90,98 @@ for nom, feed in feeds:
 crypto = get_crypto()
 marches = get_marches()
 
-send(f"🗞 RAPPORT QUOTIDIEN\n📅 {date_complete}\n📰 {len(tous_les_titres)} titres collectes\n{'─'*35}")
+send(f"🗞 RAPPORT QUOTIDIEN\n📅 {date_complete}\n📰 {len(tous_les_titres)} titres collectes\n{'═'*35}")
 
 selection = groq_call(f"""Voici des titres d'actualite du {date_complete}.
-Selectionne exactement 6 titres les plus importants et varies : geopolitique, economie, tech, sante, science, societe. Un seul par theme.
-Reponds UNIQUEMENT avec les 6 titres, un par ligne, sans numero ni commentaire.
+Selectionne exactement 10 titres les plus importants et varies : geopolitique, economie, tech, sante, science, societe, environnement, culture. Maximum 1 titre par theme.
+Reponds UNIQUEMENT avec les 10 titres, un par ligne, sans numero ni commentaire.
 TITRES :
-{chr(10).join(tous_les_titres[:60])}""", tokens=400)
+{chr(10).join(tous_les_titres[:80])}""", tokens=600)
 
-titres = [t.strip() for t in selection.strip().split("\n") if len(t.strip()) > 20][:6]
+titres = [t.strip() for t in selection.strip().split("\n") if len(t.strip()) > 20][:10]
 
 for i, titre in enumerate(titres, 1):
-    analyse = groq_call(f"""Tu es un journaliste analyste expert. Date : {date_complete}.
+    analyse = groq_call(f"""Tu es un journaliste expert. Date : {date_complete}.
+
 Sujet : {titre}
 
-Redige une analyse complete et longue. Structure OBLIGATOIRE (sans Markdown) :
+Redige une analyse en 3 blocs EXACTEMENT, separes par une ligne vide entre chaque bloc. Sans Markdown, sans titres de section.
 
-LES FAITS
-Que se passe-t-il exactement ? Acteurs, chiffres, enjeux concrets. Minimum 80 mots.
+BLOC 1 — L'ESSENTIEL (entre 10 et 15 lignes)
+Explique clairement ce qui se passe. Qui sont les acteurs ? Quels sont les enjeux concrets ? Pourquoi c'est important aujourd'hui ? Donne des chiffres et des faits precis. Ecris de facon fluide et journalistique, pas en liste.
 
-LE CONTEXTE HISTORIQUE
-Pourquoi maintenant ? Histoire et evenements passes. Dates et faits precis. Minimum 80 mots.
+[ligne vide]
 
-LE MECANISME
-Comment ca fonctionne vraiment ? Rouages economiques ou politiques. Definis chaque terme technique. Minimum 80 mots.
+BLOC 2 — LES TERMES A CONNAITRE (5 a 8 lignes)
+Explique simplement les 2 ou 3 termes techniques ou concepts importants lies a ce sujet. Style dictionnaire simple, accessible a tous.
 
-LA CURIOSITE
-Un fait surprenant, peu connu ou contre-intuitif. Ce que 95% des gens ignorent sur ce sujet. Minimum 40 mots.
+[ligne vide]
 
-LES CONSEQUENCES REELLES
-Impact concret sur la vie des gens ordinaires. Exemples tres precis. Minimum 60 mots.
+BLOC 3 — CE QUE TU NE SAVAIS PAS (5 a 8 lignes)
+Un ou deux faits surprenants, peu connus ou contre-intuitifs sur ce sujet. Quelque chose qui etonne, qui fait reflechir, ou qui donne une nouvelle perspective. Style curieux et vivant.
 
-LA PROJECTION
-Ce qui va probablement se passer dans les 4 prochaines semaines. Realiste et argumente. Minimum 50 mots.
+Sans Markdown. Sans titres de section. Juste les 3 blocs separes par une ligne vide.""", tokens=2000)
 
-Total minimum : 400 mots. Style dense, curieux, intelligent. Sans Markdown.""", tokens=2000)
+    send(sep(f"📰 {i}/10 — {titre.upper()}") + analyse)
 
-    send(sep(f"SUJET {i}/6 — {titre.upper()}") + analyse)
-
+# MARCHES
 if marches:
-    texte_marches = sep("MARCHES FINANCIERS — DONNEES EN TEMPS REEL")
+    texte_marches = sep("📈 MARCHES FINANCIERS — EN TEMPS REEL")
     for nom, d in marches.items():
         emoji = "🟢" if d["change"] > 0 else "🔴"
         texte_marches += f"{emoji} {nom} : {d['prix']:.2f} ({d['change']:+.2f}%)\n"
     send(texte_marches)
 
+# CRYPTO
 if crypto:
     btc = crypto.get("bitcoin", {})
     eth = crypto.get("ethereum", {})
     sol = crypto.get("solana", {})
 
-    donnees_crypto = f"""Bitcoin : ${btc.get('usd', 0):,.0f} ({btc.get('usd_24h_change', 0):+.2f}% sur 24h)
-Ethereum : ${eth.get('usd', 0):,.0f} ({eth.get('usd_24h_change', 0):+.2f}% sur 24h)
-Solana : ${sol.get('usd', 0):,.0f} ({sol.get('usd_24h_change', 0):+.2f}% sur 24h)"""
+    donnees_crypto = (
+        f"₿  Bitcoin  : ${btc.get('usd', 0):,.0f}  ({btc.get('usd_24h_change', 0):+.2f}%)\n"
+        f"Ξ  Ethereum : ${eth.get('usd', 0):,.0f}  ({eth.get('usd_24h_change', 0):+.2f}%)\n"
+        f"◎  Solana   : ${sol.get('usd', 0):,.0f}  ({sol.get('usd_24h_change', 0):+.2f}%)"
+    )
 
     analyse_crypto = groq_call(f"""Date : {date_complete}
-Voici les prix crypto reels :
+Prix crypto reels :
 {donnees_crypto}
-Actualites du jour : {', '.join(titres[:3])}
+Actualites du jour : {', '.join(titres[:4])}
 
-Analyse en 200 mots :
-- Que signifie cette tendance aujourd'hui ?
-- Quel evenement macro explique ce mouvement ?
-- Une curiosite peu connue sur Bitcoin ou la blockchain
-- Projection a 2 semaines
-Sans Markdown. Ne pas inventer de chiffres.""", tokens=600)
+Ecris une analyse courte en 2 blocs separes par une ligne vide :
 
-    send(sep("CRYPTO DU JOUR — DONNEES EN TEMPS REEL") + donnees_crypto + "\n\n" + analyse_crypto)
+BLOC 1 (8 lignes) : Que signifie cette tendance ? Quel evenement macro l'explique ?
 
+BLOC 2 (5 lignes) : Une curiosite peu connue sur Bitcoin ou la blockchain.
+
+Sans Markdown. Sans titres.""", tokens=500)
+
+    send(sep("₿ CRYPTO DU JOUR — EN TEMPS REEL") + donnees_crypto + "\n\n" + analyse_crypto)
+
+# INVESTISSEMENT
 invest = groq_call(f"""Date : {date_complete}
 Sujets du jour : {', '.join(titres)}
 
 Identifie UNE entreprise cotee en bourse liee a ces actualites.
-Analyse en 200 mots :
-- Nom complet et secteur
-- Lien direct avec l'actualite du jour
-- Ce qui peut faire bouger le titre aujourd'hui
-- Risques concrets
-- Un fait peu connu sur cette entreprise
-Ne donne aucun prix precis car tu n'as pas acces aux donnees temps reel.
+Ecris en 2 blocs separes par une ligne vide :
+
+BLOC 1 (8 lignes) : Nom, secteur, lien avec l'actualite du jour, ce qui peut faire bouger le titre.
+
+BLOC 2 (5 lignes) : Risques concrets + un fait peu connu sur cette entreprise.
+
 Termine par : Analyse pedagogique uniquement, pas un conseil financier.
-Sans Markdown.""", tokens=800)
+Sans Markdown. Sans titres.""", tokens=600)
 
-send(sep("INVESTISSEMENT DU JOUR") + invest)
+send(sep("💼 INVESTISSEMENT DU JOUR") + invest)
 
+# SYNTHESE
 synthese = groq_call(f"""Date : {date_complete}
 Sujets analyses : {', '.join(titres)}
 
-Ecris une synthese de 150 mots. Pas un resume — une lecture transversale.
-Quelle tendance profonde relie ces evenements ? Qu'est-ce que ca dit du monde aujourd'hui ?
-Sans Markdown.""", tokens=500)
+Ecris une synthese de 10 lignes maximum. Pas un resume article par article.
+Une lecture transversale : quelle tendance profonde relie ces evenements ?
+Qu'est-ce que ca dit du monde aujourd'hui ? Termine par une phrase forte et marquante.
+Sans Markdown.""", tokens=400)
 
-send(sep("SYNTHESE FINALE") + synthese + f"\n\n{'─'*35}\nFin du rapport — {date_complete} 🗞")
+send(sep("📊 SYNTHESE DU JOUR") + synthese + f"\n\n{'═'*35}\n🗞 Fin du rapport — {date_complete}")
