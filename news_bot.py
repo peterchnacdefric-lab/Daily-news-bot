@@ -1,9 +1,6 @@
-import os
-import requests
-import xml.etree.ElementTree as ET
+import os, requests, xml.etree.ElementTree as ET, time
 from groq import Groq
 from datetime import datetime
-import time
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
@@ -11,58 +8,58 @@ GROQ_KEY = os.environ["GROQ_KEY"]
 
 now = datetime.now()
 date_complete = now.strftime("%A %d %B %Y")
-headers = {"User-Agent": "Mozilla/5.0 (compatible; NewsBot/1.0)"}
+H = {"User-Agent": "Mozilla/5.0"}
 
-# -----------------------------
-# DONNEES CRYPTO REELLES (CoinGecko - 100% gratuit)
-# -----------------------------
+def send(text):
+    for i in range(0, len(text), 4000):
+        requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+            json={"chat_id": CHAT_ID, "text": text[i:i+4000]})
+        time.sleep(0.5)
+
+def sep(titre):
+    return f"\n\n{'─'*35}\n◆ {titre}\n{'─'*35}\n\n"
+
+def groq_call(prompt, tokens=2000):
+    time.sleep(3)
+    c = Groq(api_key=GROQ_KEY)
+    r = c.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=tokens,
+        temperature=0.85)
+    return r.choices[0].message.content
+
 def get_crypto():
     try:
-        url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true"
-        r = requests.get(url, timeout=10)
-        data = r.json()
-        btc = data["bitcoin"]
-        eth = data["ethereum"]
-        sol = data["solana"]
-        return {
-            "btc_prix": btc["usd"],
-            "btc_change": btc["usd_24h_change"],
-            "eth_prix": eth["usd"],
-            "eth_change": eth["usd_24h_change"],
-            "sol_prix": sol["usd"],
-            "sol_change": sol["usd_24h_change"],
-        }
+        r = requests.get(
+            "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true",
+            timeout=10)
+        return r.json()
     except:
         return None
 
-# -----------------------------
-# DONNEES MARCHES REELLES (Yahoo Finance - gratuit)
-# -----------------------------
 def get_marches():
+    res = {}
     symboles = {
         "CAC 40": "%5EFCHI",
         "S&P 500": "%5EGSPC",
-        "Pétrole Brent": "BZ%3DF",
+        "Petrole Brent": "BZ%3DF",
         "Or": "GC%3DF",
         "EUR/USD": "EURUSD%3DX"
     }
-    resultats = {}
-    for nom, symbole in symboles.items():
+    for nom, s in symboles.items():
         try:
-            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbole}?interval=1d&range=2d"
-            r = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
-            data = r.json()
-            prix = data["chart"]["result"][0]["meta"]["regularMarketPrice"]
-            prev = data["chart"]["result"][0]["meta"]["previousClose"]
-            change = ((prix - prev) / prev) * 100
-            resultats[nom] = {"prix": prix, "change": change}
+            r = requests.get(
+                f"https://query1.finance.yahoo.com/v8/finance/chart/{s}?interval=1d&range=2d",
+                timeout=10, headers=H)
+            d = r.json()["chart"]["result"][0]["meta"]
+            prix = d["regularMarketPrice"]
+            prev = d["previousClose"]
+            res[nom] = {"prix": prix, "change": ((prix - prev) / prev) * 100}
         except:
             continue
-    return resultats
+    return res
 
-# -----------------------------
-# COLLECTE NEWS
-# -----------------------------
 feeds = [
     ("Monde FR",    "https://news.google.com/rss/headlines/section/topic/WORLD?hl=fr&gl=FR&ceid=FR:fr"),
     ("France",      "https://news.google.com/rss/headlines/section/topic/NATION?hl=fr&gl=FR&ceid=FR:fr"),
@@ -79,7 +76,7 @@ feeds = [
 tous_les_titres = []
 for nom, feed in feeds:
     try:
-        r = requests.get(feed, timeout=15, headers=headers)
+        r = requests.get(feed, timeout=15, headers=H)
         root = ET.fromstring(r.content)
         for item in root.findall(".//item")[:12]:
             title = item.find("title")
@@ -90,167 +87,102 @@ for nom, feed in feeds:
     except:
         continue
 
-# -----------------------------
-# RECUPERATION DONNEES
-# -----------------------------
 crypto = get_crypto()
 marches = get_marches()
 
-client = Groq(api_key=GROQ_KEY)
+send(f"🗞 RAPPORT QUOTIDIEN\n📅 {date_complete}\n📰 {len(tous_les_titres)} titres collectes\n{'─'*35}")
 
-def groq_call(prompt, tokens=2000):
-    time.sleep(2)
-    completion = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=tokens,
-        temperature=0.8
-    )
-    return completion.choices[0].message.content
-
-def send(text):
-    for i in range(0, len(text), 4000):
-        requests.post(
-            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            json={"chat_id": CHAT_ID, "text": text[i:i+4000]}
-        )
-        time.sleep(0.5)
-
-# -----------------------------
-# SELECTION DES 6 MEILLEURS TITRES
-# -----------------------------
-selection_prompt = f"""Voici des titres d'actualite du {date_complete}.
-
-Selectionne exactement 6 titres les plus importants et varies (geopolitique, economie, tech, sante, science, societe). Un seul titre par theme.
-
+selection = groq_call(f"""Voici des titres d'actualite du {date_complete}.
+Selectionne exactement 6 titres les plus importants et varies : geopolitique, economie, tech, sante, science, societe. Un seul par theme.
 Reponds UNIQUEMENT avec les 6 titres, un par ligne, sans numero ni commentaire.
-
 TITRES :
-{chr(10).join(tous_les_titres[:60])}"""
+{chr(10).join(tous_les_titres[:60])}""", tokens=400)
 
-selection_brute = groq_call(selection_prompt, tokens=500)
-titres_selectionnes = [t.strip() for t in selection_brute.strip().split("\n") if len(t.strip()) > 20][:6]
+titres = [t.strip() for t in selection.strip().split("\n") if len(t.strip()) > 20][:6]
 
-# -----------------------------
-# ENVOI HEADER
-# -----------------------------
-send(f"🗞 RAPPORT QUOTIDIEN\n📅 {date_complete}\n📰 {len(tous_les_titres)} titres collectes\n{'='*30}")
+for i, titre in enumerate(titres, 1):
+    analyse = groq_call(f"""Tu es un journaliste analyste expert. Date : {date_complete}.
+Sujet : {titre}
 
-# -----------------------------
-# ANALYSE DE CHAQUE ARTICLE
-# -----------------------------
-for i, titre in enumerate(titres_selectionnes, 1):
-    prompt_article = f"""Tu es un journaliste analyste expert. Date : {date_complete}.
-
-Sujet unique a analyser : {titre}
-
-Redige une analyse complete. Tu n'as PAS acces a internet donc base-toi sur tes connaissances generales pour contextualiser ce titre.
-
-Structure obligatoire (sans Markdown) :
+Redige une analyse complete et longue. Structure OBLIGATOIRE (sans Markdown) :
 
 LES FAITS
-Que se passe-t-il ? Qui sont les acteurs ? Quels enjeux concrets ?
+Que se passe-t-il exactement ? Acteurs, chiffres, enjeux concrets. Minimum 80 mots.
 
 LE CONTEXTE HISTORIQUE
-Pourquoi ca arrive maintenant ? Histoire et evenements passes qui expliquent la situation. Donne des dates et des faits precis.
+Pourquoi maintenant ? Histoire et evenements passes. Dates et faits precis. Minimum 80 mots.
 
 LE MECANISME
-Comment ca fonctionne vraiment ? Explique les rouages economiques, politiques ou scientifiques. Definis chaque terme technique simplement.
+Comment ca fonctionne vraiment ? Rouages economiques ou politiques. Definis chaque terme technique. Minimum 80 mots.
 
 LA CURIOSITE
-Un fait surprenant, peu connu ou contre-intuitif lie a ce sujet. Quelque chose que 95% des gens ignorent.
+Un fait surprenant, peu connu ou contre-intuitif. Ce que 95% des gens ignorent sur ce sujet. Minimum 40 mots.
 
 LES CONSEQUENCES REELLES
-Impact concret sur la vie quotidienne des gens ordinaires. Exemples tres precis.
+Impact concret sur la vie des gens ordinaires. Exemples tres precis. Minimum 60 mots.
 
 LA PROJECTION
-Ce qui va probablement se passer dans les 4 prochaines semaines. Realiste et argumente.
+Ce qui va probablement se passer dans les 4 prochaines semaines. Realiste et argumente. Minimum 50 mots.
 
-Minimum 350 mots. Style dense et intelligent."""
+Total minimum : 400 mots. Style dense, curieux, intelligent. Sans Markdown.""", tokens=2000)
 
-    analyse = groq_call(prompt_article, tokens=2000)
-    bloc = f"\n{'='*30}\n📰 {i}/6 — {titre.upper()}\n{'='*30}\n\n{analyse}"
-    send(bloc)
+    send(sep(f"SUJET {i}/6 — {titre.upper()}") + analyse)
 
-# -----------------------------
-# MARCHES FINANCIERS (donnees reelles)
-# -----------------------------
-marches_text = f"\n{'='*30}\n📈 MARCHES DU JOUR — DONNEES EN TEMPS REEL\n{'='*30}\n"
+# MARCHES
 if marches:
-    for nom, data in marches.items():
-        emoji = "🟢" if data["change"] > 0 else "🔴"
-        marches_text += f"{emoji} {nom} : {data['prix']:.2f} ({data['change']:+.2f}%)\n"
-else:
-    marches_text += "Donnees de marche indisponibles aujourd'hui.\n"
-send(marches_text)
+    texte_marches = sep("MARCHES FINANCIERS — DONNEES EN TEMPS REEL")
+    for nom, d in marches.items():
+        emoji = "🟢" if d["change"] > 0 else "🔴"
+        texte_marches += f"{emoji} {nom} : {d['prix']:.2f} ({d['change']:+.2f}%)\n"
+    send(texte_marches)
 
-# -----------------------------
-# CRYPTO (donnees reelles)
-# -----------------------------
+# CRYPTO
 if crypto:
-    btc_emoji = "🟢" if crypto["btc_change"] > 0 else "🔴"
-    eth_emoji = "🟢" if crypto["eth_change"] > 0 else "🔴"
-    sol_emoji = "🟢" if crypto["sol_change"] > 0 else "🔴"
+    btc = crypto.get("bitcoin", {})
+    eth = crypto.get("ethereum", {})
+    sol = crypto.get("solana", {})
 
-    crypto_text = f"\n{'='*30}\n₿ CRYPTO DU JOUR — DONNEES EN TEMPS REEL\n{'='*30}\n\n"
-    crypto_text += f"{btc_emoji} Bitcoin : ${crypto['btc_prix']:,.0f} ({crypto['btc_change']:+.2f}% sur 24h)\n"
-    crypto_text += f"{eth_emoji} Ethereum : ${crypto['eth_prix']:,.0f} ({crypto['eth_change']:+.2f}% sur 24h)\n"
-    crypto_text += f"{sol_emoji} Solana : ${crypto['sol_prix']:,.0f} ({crypto['sol_change']:+.2f}% sur 24h)\n"
+    donnees_crypto = f"""Bitcoin : ${btc.get('usd', 0):,.0f} ({btc.get('usd_24h_change', 0):+.2f}% sur 24h)
+Ethereum : ${eth.get('usd', 0):,.0f} ({eth.get('usd_24h_change', 0):+.2f}% sur 24h)
+Solana : ${sol.get('usd', 0):,.0f} ({sol.get('usd_24h_change', 0):+.2f}% sur 24h)"""
 
-    prompt_crypto = f"""Date : {date_complete}
-
-Voici les prix crypto reels d'aujourd'hui :
-Bitcoin : ${crypto['btc_prix']:,.0f} ({crypto['btc_change']:+.2f}% sur 24h)
-Ethereum : ${crypto['eth_prix']:,.0f} ({crypto['eth_change']:+.2f}% sur 24h)
-Solana : ${crypto['sol_prix']:,.0f} ({crypto['sol_change']:+.2f}% sur 24h)
-
-Actualites du jour : {', '.join(titres_selectionnes[:3])}
+    analyse_crypto = groq_call(f"""Date : {date_complete}
+Voici les prix crypto reels :
+{donnees_crypto}
+Actualites du jour : {', '.join(titres[:3])}
 
 Analyse en 200 mots :
 - Que signifie cette tendance aujourd'hui ?
 - Quel evenement macro explique ce mouvement ?
 - Une curiosite peu connue sur Bitcoin ou la blockchain
 - Projection a 2 semaines
+Sans Markdown. Ne pas inventer de chiffres.""", tokens=600)
 
-Sans Markdown. Pas d'invention de chiffres."""
+    send(sep("CRYPTO DU JOUR — DONNEES EN TEMPS REEL") + donnees_crypto + "\n\n" + analyse_crypto)
 
-    crypto_analyse = groq_call(prompt_crypto, tokens=600)
-    crypto_text += f"\n{crypto_analyse}"
-    send(crypto_text)
-else:
-    send(f"\n{'='*30}\n₿ CRYPTO\n{'='*30}\nDonnees indisponibles aujourd'hui.")
-
-# -----------------------------
 # INVESTISSEMENT
-# -----------------------------
-prompt_invest = f"""Date : {date_complete}
-Sujets du jour : {', '.join(titres_selectionnes)}
+invest = groq_call(f"""Date : {date_complete}
+Sujets du jour : {', '.join(titres)}
 
 Identifie UNE entreprise cotee en bourse liee a ces actualites.
-
 Analyse en 200 mots :
-- Nom et secteur
+- Nom complet et secteur
 - Lien direct avec l'actualite du jour
-- Ce qui peut faire bouger le titre
+- Ce qui peut faire bouger le titre aujourd'hui
 - Risques concrets
 - Un fait peu connu sur cette entreprise
+Ne donne aucun prix precis car tu n'as pas acces aux donnees temps reel.
+Termine par : Analyse pedagogique uniquement, pas un conseil financier.
+Sans Markdown.""", tokens=800)
 
-Ne donne AUCUN prix precis car tu n'as pas acces aux donnees en temps reel.
-Termine par : "Analyse pedagogique uniquement, pas un conseil financier."
-Sans Markdown."""
+send(sep("INVESTISSEMENT DU JOUR") + invest)
 
-invest = groq_call(prompt_invest, tokens=800)
-send(f"\n{'='*30}\n💰 INVESTISSEMENT DU JOUR\n{'='*30}\n\n{invest}")
-
-# -----------------------------
 # SYNTHESE
-# -----------------------------
-prompt_synthese = f"""Date : {date_complete}
-Sujets analyses : {', '.join(titres_selectionnes)}
+synthese = groq_call(f"""Date : {date_complete}
+Sujets analyses : {', '.join(titres)}
 
-Ecris une synthese de 150 mots. Pas un resume — une lecture transversale. Quelle tendance profonde relie ces evenements ? Qu'est-ce que ca dit du monde aujourd'hui ?
+Ecris une synthese de 150 mots. Pas un resume — une lecture transversale.
+Quelle tendance profonde relie ces evenements ? Qu'est-ce que ca dit du monde aujourd'hui ?
+Sans Markdown.""", tokens=500)
 
-Sans Markdown."""
-
-synthese = groq_call(prompt_synthese, tokens=500)
-send(f"\n{'='*30}\n📊 SYNTHESE FINALE\n{'='*30}\n\n{synthese}\n{'='*30}\nFin du rapport — {date_complete} 🗞")
+send(sep("SYNTHESE FINALE") + synthese + f"\n\n{'─'*35}\nFin du rapport — {date_complete} 🗞")
