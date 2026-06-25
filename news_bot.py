@@ -13,6 +13,56 @@ now = datetime.now()
 date_complete = now.strftime("%A %d %B %Y")
 headers = {"User-Agent": "Mozilla/5.0 (compatible; NewsBot/1.0)"}
 
+# -----------------------------
+# DONNEES CRYPTO REELLES (CoinGecko - 100% gratuit)
+# -----------------------------
+def get_crypto():
+    try:
+        url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true"
+        r = requests.get(url, timeout=10)
+        data = r.json()
+        btc = data["bitcoin"]
+        eth = data["ethereum"]
+        sol = data["solana"]
+        return {
+            "btc_prix": btc["usd"],
+            "btc_change": btc["usd_24h_change"],
+            "eth_prix": eth["usd"],
+            "eth_change": eth["usd_24h_change"],
+            "sol_prix": sol["usd"],
+            "sol_change": sol["usd_24h_change"],
+        }
+    except:
+        return None
+
+# -----------------------------
+# DONNEES MARCHES REELLES (Yahoo Finance - gratuit)
+# -----------------------------
+def get_marches():
+    symboles = {
+        "CAC 40": "%5EFCHI",
+        "S&P 500": "%5EGSPC",
+        "Pétrole Brent": "BZ%3DF",
+        "Or": "GC%3DF",
+        "EUR/USD": "EURUSD%3DX"
+    }
+    resultats = {}
+    for nom, symbole in symboles.items():
+        try:
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbole}?interval=1d&range=2d"
+            r = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+            data = r.json()
+            prix = data["chart"]["result"][0]["meta"]["regularMarketPrice"]
+            prev = data["chart"]["result"][0]["meta"]["previousClose"]
+            change = ((prix - prev) / prev) * 100
+            resultats[nom] = {"prix": prix, "change": change}
+        except:
+            continue
+    return resultats
+
+# -----------------------------
+# COLLECTE NEWS
+# -----------------------------
 feeds = [
     ("Monde FR",    "https://news.google.com/rss/headlines/section/topic/WORLD?hl=fr&gl=FR&ceid=FR:fr"),
     ("France",      "https://news.google.com/rss/headlines/section/topic/NATION?hl=fr&gl=FR&ceid=FR:fr"),
@@ -40,6 +90,12 @@ for nom, feed in feeds:
     except:
         continue
 
+# -----------------------------
+# RECUPERATION DONNEES
+# -----------------------------
+crypto = get_crypto()
+marches = get_marches()
+
 client = Groq(api_key=GROQ_KEY)
 
 def groq_call(prompt, tokens=2000):
@@ -60,12 +116,14 @@ def send(text):
         )
         time.sleep(0.5)
 
-# Etape 1 : choisir les 6 meilleurs titres
-selection_prompt = f"""Voici {len(tous_les_titres)} titres d'actualite du {date_complete}.
+# -----------------------------
+# SELECTION DES 6 MEILLEURS TITRES
+# -----------------------------
+selection_prompt = f"""Voici des titres d'actualite du {date_complete}.
 
-Selectionne exactement 6 titres, les plus importants et varies possible (geopolitique, economie, tech, sante, societe, science). Pas deux fois le meme theme.
+Selectionne exactement 6 titres les plus importants et varies (geopolitique, economie, tech, sante, science, societe). Un seul titre par theme.
 
-Reponds UNIQUEMENT avec les 6 titres selectionnes, un par ligne, sans numero ni commentaire.
+Reponds UNIQUEMENT avec les 6 titres, un par ligne, sans numero ni commentaire.
 
 TITRES :
 {chr(10).join(tous_les_titres[:60])}"""
@@ -73,85 +131,126 @@ TITRES :
 selection_brute = groq_call(selection_prompt, tokens=500)
 titres_selectionnes = [t.strip() for t in selection_brute.strip().split("\n") if len(t.strip()) > 20][:6]
 
-# Etape 2 : analyser chaque titre separement
-send(f"🗞 RAPPORT QUOTIDIEN\n📅 {date_complete}\n📰 {len(tous_les_titres)} titres collectes\n\n{'='*30}")
+# -----------------------------
+# ENVOI HEADER
+# -----------------------------
+send(f"🗞 RAPPORT QUOTIDIEN\n📅 {date_complete}\n📰 {len(tous_les_titres)} titres collectes\n{'='*30}")
 
+# -----------------------------
+# ANALYSE DE CHAQUE ARTICLE
+# -----------------------------
 for i, titre in enumerate(titres_selectionnes, 1):
-    prompt_article = f"""Tu es un journaliste analyste expert. Aujourd'hui : {date_complete}.
+    prompt_article = f"""Tu es un journaliste analyste expert. Date : {date_complete}.
 
-Sujet : {titre}
+Sujet unique a analyser : {titre}
 
-Ecris une analyse COMPLETE et LONGUE sur ce sujet. Tu dois absolument inclure :
+Redige une analyse complete. Tu n'as PAS acces a internet donc base-toi sur tes connaissances generales pour contextualiser ce titre.
 
-1. LES FAITS : Que se passe-t-il exactement ? Qui sont les acteurs ? Quels chiffres concrets ?
+Structure obligatoire (sans Markdown) :
 
-2. LE CONTEXTE HISTORIQUE : Pourquoi ca arrive maintenant ? Quelle est l'histoire derriere ce sujet ? Donne des dates, des evenements passes qui expliquent la situation actuelle.
+LES FAITS
+Que se passe-t-il ? Qui sont les acteurs ? Quels enjeux concrets ?
 
-3. LES MECANISMES : Comment ca fonctionne vraiment ? Si c'est economique, explique les flux d'argent, les institutions, les marches. Si c'est geopolitique, explique les alliances, les interets, les rapports de force. Sois precis et technique, mais explique chaque terme.
+LE CONTEXTE HISTORIQUE
+Pourquoi ca arrive maintenant ? Histoire et evenements passes qui expliquent la situation. Donne des dates et des faits precis.
 
-4. LA CURIOSITE DU JOUR : Un fait surprenant, peu connu, contre-intuitif ou fascinant lie a ce sujet. Quelque chose que la plupart des gens ne savent pas.
+LE MECANISME
+Comment ca fonctionne vraiment ? Explique les rouages economiques, politiques ou scientifiques. Definis chaque terme technique simplement.
 
-5. LES CONSEQUENCES CONCRETES : Comment ca affecte la vie des gens ordinaires ? Donne des exemples tres concrets et tangibles.
+LA CURIOSITE
+Un fait surprenant, peu connu ou contre-intuitif lie a ce sujet. Quelque chose que 95% des gens ignorent.
 
-6. PROJECTION : Ce qui va probablement se passer dans les 4 prochaines semaines. Sois realiste et precis.
+LES CONSEQUENCES REELLES
+Impact concret sur la vie quotidienne des gens ordinaires. Exemples tres precis.
 
-Longueur minimum : 400 mots. Style : dense, intelligent, curieux. Aucun Markdown."""
+LA PROJECTION
+Ce qui va probablement se passer dans les 4 prochaines semaines. Realiste et argumente.
+
+Minimum 350 mots. Style dense et intelligent."""
 
     analyse = groq_call(prompt_article, tokens=2000)
-
-    bloc = f"\n\n{'='*30}\n"
-    bloc += f"📰 SUJET {i}/{len(titres_selectionnes)}\n"
-    bloc += f"{'='*30}\n\n"
-    bloc += f"🧠 {titre.upper()}\n\n"
-    bloc += analyse
+    bloc = f"\n{'='*30}\n📰 {i}/6 — {titre.upper()}\n{'='*30}\n\n{analyse}"
     send(bloc)
 
-# Etape 3 : investissement
+# -----------------------------
+# MARCHES FINANCIERS (donnees reelles)
+# -----------------------------
+marches_text = f"\n{'='*30}\n📈 MARCHES DU JOUR — DONNEES EN TEMPS REEL\n{'='*30}\n"
+if marches:
+    for nom, data in marches.items():
+        emoji = "🟢" if data["change"] > 0 else "🔴"
+        marches_text += f"{emoji} {nom} : {data['prix']:.2f} ({data['change']:+.2f}%)\n"
+else:
+    marches_text += "Donnees de marche indisponibles aujourd'hui.\n"
+send(marches_text)
+
+# -----------------------------
+# CRYPTO (donnees reelles)
+# -----------------------------
+if crypto:
+    btc_emoji = "🟢" if crypto["btc_change"] > 0 else "🔴"
+    eth_emoji = "🟢" if crypto["eth_change"] > 0 else "🔴"
+    sol_emoji = "🟢" if crypto["sol_change"] > 0 else "🔴"
+
+    crypto_text = f"\n{'='*30}\n₿ CRYPTO DU JOUR — DONNEES EN TEMPS REEL\n{'='*30}\n\n"
+    crypto_text += f"{btc_emoji} Bitcoin : ${crypto['btc_prix']:,.0f} ({crypto['btc_change']:+.2f}% sur 24h)\n"
+    crypto_text += f"{eth_emoji} Ethereum : ${crypto['eth_prix']:,.0f} ({crypto['eth_change']:+.2f}% sur 24h)\n"
+    crypto_text += f"{sol_emoji} Solana : ${crypto['sol_prix']:,.0f} ({crypto['sol_change']:+.2f}% sur 24h)\n"
+
+    prompt_crypto = f"""Date : {date_complete}
+
+Voici les prix crypto reels d'aujourd'hui :
+Bitcoin : ${crypto['btc_prix']:,.0f} ({crypto['btc_change']:+.2f}% sur 24h)
+Ethereum : ${crypto['eth_prix']:,.0f} ({crypto['eth_change']:+.2f}% sur 24h)
+Solana : ${crypto['sol_prix']:,.0f} ({crypto['sol_change']:+.2f}% sur 24h)
+
+Actualites du jour : {', '.join(titres_selectionnes[:3])}
+
+Analyse en 200 mots :
+- Que signifie cette tendance aujourd'hui ?
+- Quel evenement macro explique ce mouvement ?
+- Une curiosite peu connue sur Bitcoin ou la blockchain
+- Projection a 2 semaines
+
+Sans Markdown. Pas d'invention de chiffres."""
+
+    crypto_analyse = groq_call(prompt_crypto, tokens=600)
+    crypto_text += f"\n{crypto_analyse}"
+    send(crypto_text)
+else:
+    send(f"\n{'='*30}\n₿ CRYPTO\n{'='*30}\nDonnees indisponibles aujourd'hui.")
+
+# -----------------------------
+# INVESTISSEMENT
+# -----------------------------
 prompt_invest = f"""Date : {date_complete}
 Sujets du jour : {', '.join(titres_selectionnes)}
 
-Identifie UNE seule entreprise cotee en bourse directement liee a l'un de ces sujets.
+Identifie UNE entreprise cotee en bourse liee a ces actualites.
 
-Ecris une analyse de 200 mots minimum :
-- Nom complet et secteur
-- Pourquoi elle est impactee AUJOURD'HUI specifiquement
-- Chiffres concrets (prix action approximatif, capitalisation)
-- Ce qui pourrait faire monter ou baisser le titre
-- Risques reels et concrets
+Analyse en 200 mots :
+- Nom et secteur
+- Lien direct avec l'actualite du jour
+- Ce qui peut faire bouger le titre
+- Risques concrets
 - Un fait peu connu sur cette entreprise
 
-Termine par : "Ceci est une analyse pedagogique uniquement, pas un conseil financier."
+Ne donne AUCUN prix precis car tu n'as pas acces aux donnees en temps reel.
+Termine par : "Analyse pedagogique uniquement, pas un conseil financier."
+Sans Markdown."""
 
-Aucun Markdown."""
+invest = groq_call(prompt_invest, tokens=800)
+send(f"\n{'='*30}\n💰 INVESTISSEMENT DU JOUR\n{'='*30}\n\n{invest}")
 
-invest = groq_call(prompt_invest, tokens=1000)
-send(f"\n\n{'='*30}\n💰 INVESTISSEMENT DU JOUR\n{'='*30}\n\n{invest}")
-
-# Etape 4 : crypto
-prompt_crypto = f"""Date : {date_complete}
-
-Analyse le marche crypto aujourd'hui en lien avec l'actualite mondiale.
-
-Inclus :
-- Bitcoin : niveau approximatif et tendance
-- Ethereum : tendance
-- Quel evenement macro influence le marche aujourd'hui
-- Ce que font les grands investisseurs institutionnels
-- Une curiosite sur la blockchain peu connue du grand public
-- Projection a 2 semaines
-
-Minimum 150 mots. Aucun Markdown."""
-
-crypto = groq_call(prompt_crypto, tokens=800)
-send(f"\n\n{'='*30}\n₿ CRYPTO DU JOUR\n{'='*30}\n\n{crypto}")
-
-# Etape 5 : synthese
+# -----------------------------
+# SYNTHESE
+# -----------------------------
 prompt_synthese = f"""Date : {date_complete}
-Sujets analyses aujourd'hui : {', '.join(titres_selectionnes)}
+Sujets analyses : {', '.join(titres_selectionnes)}
 
-Ecris une synthese globale de 150 mots. Pas un resume des sujets — une lecture transversale du monde aujourd'hui. Quelle est la tendance profonde qui relie ces evenements ? Qu'est-ce que ca dit de l'etat du monde en ce moment ? Qu'est-ce qu'il faut absolument retenir ?
+Ecris une synthese de 150 mots. Pas un resume — une lecture transversale. Quelle tendance profonde relie ces evenements ? Qu'est-ce que ca dit du monde aujourd'hui ?
 
-Aucun Markdown."""
+Sans Markdown."""
 
-synthese = groq_call(prompt_synthese, tokens=600)
-send(f"\n\n{'='*30}\n📊 SYNTHESE FINALE\n{'='*30}\n\n{synthese}\n\n{'='*30}\nFin du rapport — {date_complete}")
+synthese = groq_call(prompt_synthese, tokens=500)
+send(f"\n{'='*30}\n📊 SYNTHESE FINALE\n{'='*30}\n\n{synthese}\n{'='*30}\nFin du rapport — {date_complete} 🗞")
