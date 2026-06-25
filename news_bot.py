@@ -13,126 +13,120 @@ now = datetime.now()
 date_complete = now.strftime("%A %d %B %Y")
 
 # -----------------------------
-# SOURCES MULTI (NEWS + FINANCE + ÉNERGIE)
+# SOURCES FIABLES ET ACCESSIBLES
 # -----------------------------
 feeds = [
-    "https://news.google.com/rss?hl=fr&gl=FR&ceid=FR:fr",
-    "https://www.lemonde.fr/rss/une.xml",
-    "https://www.lemonde.fr/international/rss_full.xml",
-    "https://www.lemonde.fr/economie/rss_full.xml",
-    "https://feeds.leparisien.fr/leparisien/rss",
-    "https://www.lavanguardia.com/rss/home.xml",
-    "https://news.yahoo.com/rss/",
-    "https://finance.yahoo.com/news/rssindex"
+    ("Google News FR", "https://news.google.com/rss?hl=fr&gl=FR&ceid=FR:fr"),
+    ("Google News Monde", "https://news.google.com/rss/headlines/section/topic/WORLD?hl=fr&gl=FR&ceid=FR:fr"),
+    ("Google News Économie", "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=fr&gl=FR&ceid=FR:fr"),
+    ("Google News Tech", "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=fr&gl=FR&ceid=FR:fr"),
+    ("Google News Science", "https://news.google.com/rss/headlines/section/topic/SCIENCE?hl=fr&gl=FR&ceid=FR:fr"),
+    ("Yahoo Finance", "https://finance.yahoo.com/news/rssindex"),
+    ("Yahoo News", "https://news.yahoo.com/rss/"),
+    ("Reuters", "https://feeds.reuters.com/reuters/topNews"),
+    ("BBC Monde", "http://feeds.bbci.co.uk/news/world/rss.xml"),
+    ("RFI", "https://www.rfi.fr/fr/rss"),
 ]
 
+headers = {
+    "User-Agent": "Mozilla/5.0 (compatible; NewsBot/1.0)"
+}
+
 # -----------------------------
-# COLLECTE (minimum volume garanti)
+# COLLECTE ROBUSTE
 # -----------------------------
 articles = []
+sources_ok = []
+sources_ko = []
 
-for feed in feeds:
+for nom, feed in feeds:
     try:
-        r = requests.get(feed, timeout=10)
+        r = requests.get(feed, timeout=15, headers=headers)
         root = ET.fromstring(r.content)
-
-        for item in root.findall(".//item")[:15]:
-            title = item.find("title").text
-            if title and title not in articles:
-                articles.append(title)
-    except:
+        count = 0
+        for item in root.findall(".//item")[:12]:
+            title = item.find("title")
+            if title is not None and title.text:
+                texte = title.text.strip()
+                if texte not in articles and len(texte) > 15:
+                    articles.append(texte)
+                    count += 1
+        sources_ok.append(f"{nom} ({count} articles)")
+    except Exception as e:
+        sources_ko.append(nom)
         continue
 
-# garantie minimum
-articles = articles[:50]
-
-texte_brut = "\n".join(articles)
+articles = articles[:60]
+texte_brut = "\n".join([f"- {a}" for a in articles])
 
 # -----------------------------
-# PROMPT FINAL LONG FORMAT
+# PROMPT
 # -----------------------------
 prompt = f"""
-Tu es un journaliste analyste économique et géopolitique expert simplifié.
+Tu es un journaliste analyste économique et géopolitique expert.
 
-DATE :
-{date_complete}
+DATE : {date_complete}
 
-MISSION :
-Créer un rapport quotidien très détaillé basé sur l’actualité mondiale.
+Tu as accès à {len(articles)} titres d'actualité provenant de sources internationales.
+
+MISSION : Créer un rapport quotidien approfondi basé sur ces actualités.
 
 RÈGLES STRICTES :
-- utiliser EXACTEMENT les titres fournis
-- aucun Markdown
-- minimum 10 articles distincts
-- explications longues (10 à 20 lignes par article)
-- style pédagogique et clair
-- chaque article doit apprendre quelque chose de nouveau
+- Minimum 10 articles distincts traités
+- Explications longues et détaillées (15 à 25 lignes par article)
+- Style pédagogique, clair, sans jargon non expliqué
+- Aucun Markdown (pas de **, pas de #)
+- Chaque article doit vraiment apprendre quelque chose
 
 ------------------------------------
 FORMAT POUR CHAQUE ARTICLE
 ------------------------------------
 
-🧠 TITRE (identique à la source)
+🧠 TITRE (reprendre le titre source)
 
 📌 Explication détaillée :
-- 10 à 20 lignes minimum
-- expliquer les faits en profondeur
-- expliquer le contexte géopolitique ou économique
-- expliquer les acteurs impliqués
-- expliquer pourquoi cela arrive
-- ajouter des détails utiles pour comprendre le monde réel
+- Expliquer les faits en profondeur
+- Expliquer le contexte géopolitique ou économique
+- Qui sont les acteurs, leurs intérêts, leurs relations
+- Pourquoi cela se passe maintenant
+- Conséquences concrètes pour les citoyens ordinaires
 
-🧠 Apprentissage et contexte :
-- intégrer des explications pédagogiques dans le texte
-- expliquer les mécanismes (économie, politique, institutions, énergie, marchés)
-- donner du sens global (comment ça fonctionne dans le monde réel)
-- ajouter des exemples simples si nécessaire
+🎓 Pédagogie :
+- Expliquer les mécanismes en jeu
+- Définir les termes techniques clairement
+- Donner un exemple concret du monde réel si utile
 
-🔎 Termes techniques :
-- expliquer clairement les mots compliqués utilisés dans la news
-- banques centrales, inflation, pétrole, taux, etc.
-
-🔮 Projection :
-- UN seul scénario possible
-- expliquer ce qui est le plus probable dans le futur
-- conséquences concrètes
+🔮 Ce qui va probablement se passer :
+- 1 scénario probable et réaliste
+- Conséquences concrètes à court terme
 
 ------------------------------------
-💰 INVESTISSEMENT FINAL
+💰 INVESTISSEMENT DU JOUR
 ------------------------------------
+IMPORTANT : Ne traiter cette section QUE si Yahoo Finance ou Reuters fournit des données financières claires dans les titres. Si aucune donnée financière pertinente n'est disponible, écrire simplement : "Pas assez de données financières aujourd'hui pour une analyse fiable."
 
-- 1 seule entreprise cotée en bourse
-- liée aux actualités du jour
-- explication longue :
-  pourquoi elle est impactée
-  pourquoi elle est intéressante
-  risques
-- inclure prix de l’action actuel ou estimé
+Si données disponibles :
+- 1 entreprise cotée en bourse liée aux actualités
+- Pourquoi elle est impactée aujourd'hui
+- Risques réels
+- Avertissement : ceci est pédagogique, pas un conseil financier
 
 ------------------------------------
 ₿ CRYPTO DU JOUR
 ------------------------------------
-
-- Bitcoin
-- Ethereum
-- marché crypto global
-- lien avec macro économie
+- Bitcoin et Ethereum : tendance actuelle
+- Lien avec la macroéconomie mondiale
+- Ce qui influence les prix en ce moment
 
 ------------------------------------
 📊 SYNTHÈSE FINALE
 ------------------------------------
-
-- résumé du monde aujourd’hui
-- tendance globale
-- 5 à 7 lignes
+- Résumé du monde aujourd'hui en 6 à 8 lignes
+- Tendance globale
+- Ce qu'il faut retenir
 
 ------------------------------------
-IMPORTANT :
-- très longue profondeur d’explication
-- objectif : comprendre le monde, pas juste lire les news
-- priorité à la pédagogie + clarté
-
-NEWS :
+TITRES DU JOUR :
 {texte_brut}
 """
 
@@ -143,7 +137,7 @@ client = Groq(api_key=GROQ_KEY)
 completion = client.chat.completions.create(
     model="llama-3.3-70b-versatile",
     messages=[{"role": "user", "content": prompt}],
-    max_tokens=6000
+    max_tokens=7000
 )
 
 resume = completion.choices[0].message.content
@@ -158,4 +152,10 @@ def send(text):
             json={"chat_id": CHAT_ID, "text": text[i:i+4000]}
         )
 
-send(resume)
+header = f"🗞 RAPPORT QUOTIDIEN — {date_complete}\n"
+header += f"✅ Sources actives : {', '.join(sources_ok)}\n"
+if sources_ko:
+    header += f"❌ Sources inaccessibles : {', '.join(sources_ko)}\n"
+header += f"📰 {len(articles)} titres analysés\n\n"
+
+send(header + resume)
