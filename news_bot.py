@@ -1,4 +1,4 @@
-import os, requests, xml.etree.ElementTree as ET, time
+import os, requests, xml.etree.ElementTree as ET, time, re
 from groq import Groq
 from datetime import datetime
 
@@ -8,7 +8,7 @@ GROQ_KEY = os.environ["GROQ_KEY"]
 
 now = datetime.now()
 date_complete = now.strftime("%A %d %B %Y")
-H = {"User-Agent": "Mozilla/5.0"}
+H = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
 def send(text):
     for i in range(0, len(text), 4000):
@@ -19,15 +19,29 @@ def send(text):
 def sep(titre):
     return f"\n\n{'═'*35}\n{titre}\n{'═'*35}\n\n"
 
-def groq_call(prompt, tokens=1200):
+def groq_call(prompt, tokens=1000):
     time.sleep(3)
     c = Groq(api_key=GROQ_KEY)
     r = c.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
         max_tokens=tokens,
-        temperature=0.85)
+        temperature=0.7)
     return r.choices[0].message.content
+
+def get_article_content(url):
+    try:
+        r = requests.get(url, timeout=10, headers=H)
+        text = r.text
+        # Supprime les balises HTML
+        text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.DOTALL)
+        text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL)
+        text = re.sub(r'<[^>]+>', ' ', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+        # Garde les 3000 premiers caractères
+        return text[:3000]
+    except:
+        return ""
 
 def get_crypto():
     try:
@@ -68,11 +82,11 @@ feeds = [
     ("Reuters",        "https://feeds.reuters.com/reuters/topNews"),
     ("Yahoo Finance",  "https://finance.yahoo.com/news/rssindex"),
     ("RFI",            "https://www.rfi.fr/fr/rss"),
-    ("Liberation",     "https://www.liberation.fr/arc/outboundfeeds/rss/"),
     ("Les Echos",      "https://feeds.lesechos.fr/lesechos-unes"),
     ("Der Spiegel EN", "https://www.spiegel.de/international/index.rss"),
-    ("El Pais EN",     "https://feeds.elpais.com/mrss-s/pages/ep/site/english.elpais.com/portada"),
     ("The Guardian",   "https://www.theguardian.com/world/rss"),
+    ("El Pais EN",     "https://feeds.elpais.com/mrss-s/pages/ep/site/english.elpais.com/portada"),
+    ("Liberation",     "https://www.liberation.fr/arc/outboundfeeds/rss/"),
 ]
 
 articles = []
@@ -86,20 +100,19 @@ for nom, feed in feeds:
             item = items[0]
             title = item.find("title")
             link = item.find("link")
+            desc = item.find("description")
             if title is not None and title.text and len(title.text.strip()) > 20:
                 lien = ""
                 if link is not None and link.text:
                     lien = link.text.strip()
-                else:
-                    lien = item.find("{http://www.w3.org/2005/Atom}link")
-                    if lien is not None:
-                        lien = lien.get("href", "")
-                    else:
-                        lien = ""
+                description = ""
+                if desc is not None and desc.text:
+                    description = re.sub(r'<[^>]+>', '', desc.text).strip()[:500]
                 articles.append({
                     "titre": title.text.strip(),
                     "source": nom,
-                    "lien": lien
+                    "lien": lien,
+                    "description": description
                 })
     except:
         continue
@@ -141,31 +154,57 @@ for i, art in enumerate(articles_selectionnes[:6], 1):
     titre = art["titre"]
     source = art["source"]
     lien = art["lien"]
+    description = art["description"]
 
-    analyse = groq_call(f"""Tu es un journaliste expert. Date : {date_complete}.
+    # Essaie de récupérer le contenu de l'article
+    contenu = ""
+    if lien:
+        contenu = get_article_content(lien)
 
-Titre exact : {titre}
+    # Utilise la description RSS si le contenu est vide
+    contexte = contenu if len(contenu) > 200 else description
+    contexte_label = "contenu de l'article" if len(contenu) > 200 else "description disponible"
+
+    if contexte:
+        prompt = f"""Tu es un journaliste expert. Date : {date_complete}.
+
+Titre : {titre}
 Source : {source}
+{contexte_label.upper()} :
+{contexte}
 
-IMPORTANT : Base-toi uniquement sur ce titre. Ne complete pas avec des informations incertaines.
+Basé sur ce contenu réel, écris une analyse en 3 blocs séparés par UNE ligne vide. Sans titres de section. Sans Markdown.
 
-Ecris une analyse en 3 blocs. Entre chaque bloc, laisse UNE ligne vide. Sans titres. Sans Markdown.
+BLOC 1 — RESUME (6 a 8 lignes)
+Résume ce qui se passe vraiment dans cet article. Les faits concrets, les chiffres, les personnes impliquées. Pas une reformulation du titre — un vrai résumé du contenu.
 
-BLOC 1 — RESUME (5 a 7 lignes)
-Explique ce que ce titre annonce. Reste factuel et prudent si tu manques de details.
-
-BLOC 2 — MOTS CLES (3 a 4 lignes)
-Explique 2 termes techniques ou concepts importants. Simple et accessible.
+BLOC 2 — EXPLICATION SIMPLE (4 a 5 lignes)
+Explique la situation comme si tu parlais à un enfant de 10 ans. Simple, clair, sans jargon. Qu'est-ce qui se passe vraiment et pourquoi c'est important ?
 
 BLOC 3 — LE SAVIEZ-VOUS (2 a 3 lignes)
-Un fait verifiable et surprenant lie au contexte de ce sujet.
+Un fait surprenant ou peu connu directement lié au sujet de cet article.
 
-Maximum 180 mots au total.""", tokens=500)
+Maximum 200 mots au total."""
+    else:
+        prompt = f"""Tu es un journaliste expert. Date : {date_complete}.
+
+Titre : {titre}
+Source : {source}
+
+Le contenu de l'article n'est pas disponible. Basé sur ce titre et ta connaissance generale du sujet, ecris une analyse honnête en 3 blocs séparés par UNE ligne vide. Sans titres. Sans Markdown.
+
+BLOC 1 (5 lignes) : Ce que ce titre annonce probablement, avec contexte général honnête.
+BLOC 2 (4 lignes) : Explication simple comme pour un enfant de 10 ans.
+BLOC 3 (2 lignes) : Un fait surprenant lié au sujet.
+
+Précise si tu manques d'informations précises. Maximum 180 mots."""
+
+    analyse = groq_call(prompt, tokens=600)
 
     entete = f"📰 {i}/6 — {titre.upper()}\n📡 {source}"
     bloc = sep(entete) + analyse
     if lien:
-        bloc += f"\n\n🔗 Lire l'article : {lien}"
+        bloc += f"\n\n🔗 {lien}"
     send(bloc)
 
 if marches:
@@ -188,9 +227,8 @@ if crypto:
         f"{btc_e} Bitcoin  : ${btc.get('usd', 0):,.0f}  ({btc.get('usd_24h_change', 0):+.2f}%)\n"
         f"{eth_e} Ethereum : ${eth.get('usd', 0):,.0f}  ({eth.get('usd_24h_change', 0):+.2f}%)\n"
         f"{sol_e} Solana   : ${sol.get('usd', 0):,.0f}  ({sol.get('usd_24h_change', 0):+.2f}%)\n\n"
-        f"Source : CoinGecko (temps reel)"
+        f"Source : CoinGecko"
     )
-
     send(sep("₿ CRYPTO — DONNEES EN TEMPS REEL") + donnees_crypto)
 
 titres_analyses = [a["titre"] for a in articles_selectionnes[:6]]
