@@ -33,12 +33,17 @@ def get_article_content(url):
     try:
         r = requests.get(url, timeout=10, headers=H)
         text = r.text
-        # Supprime les balises HTML
+        # Détecte les paywalls et blocages
+        bloque = any(mot in text.lower() for mot in [
+            "abonnez-vous", "subscribe", "paywall", "automated traffic",
+            "access denied", "403 forbidden", "robot", "captcha"
+        ])
+        if bloque:
+            return ""
         text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.DOTALL)
         text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL)
         text = re.sub(r'<[^>]+>', ' ', text)
         text = re.sub(r'\s+', ' ', text).strip()
-        # Garde les 3000 premiers caractères
         return text[:3000]
     except:
         return ""
@@ -107,7 +112,7 @@ for nom, feed in feeds:
                     lien = link.text.strip()
                 description = ""
                 if desc is not None and desc.text:
-                    description = re.sub(r'<[^>]+>', '', desc.text).strip()[:500]
+                    description = re.sub(r'<[^>]+>', '', desc.text).strip()[:800]
                 articles.append({
                     "titre": title.text.strip(),
                     "source": nom,
@@ -156,50 +161,56 @@ for i, art in enumerate(articles_selectionnes[:6], 1):
     lien = art["lien"]
     description = art["description"]
 
-    # Essaie de récupérer le contenu de l'article
     contenu = ""
     if lien:
         contenu = get_article_content(lien)
 
-    # Utilise la description RSS si le contenu est vide
-    contexte = contenu if len(contenu) > 200 else description
-    contexte_label = "contenu de l'article" if len(contenu) > 200 else "description disponible"
+    # Choisit la meilleure source de contenu disponible
+    if len(contenu) > 300:
+        contexte = contenu
+        source_contexte = "contenu complet de l'article"
+    elif len(description) > 100:
+        contexte = description
+        source_contexte = "description de l'article"
+    else:
+        contexte = ""
+        source_contexte = ""
 
     if contexte:
         prompt = f"""Tu es un journaliste expert. Date : {date_complete}.
 
 Titre : {titre}
 Source : {source}
-{contexte_label.upper()} :
+Contenu disponible :
 {contexte}
 
-Basé sur ce contenu réel, écris une analyse en 3 blocs séparés par UNE ligne vide. Sans titres de section. Sans Markdown.
+Ecris une analyse en 3 blocs séparés par UNE ligne vide. Sans titres de section. Sans Markdown.
 
-BLOC 1 — RESUME (6 a 8 lignes)
-Résume ce qui se passe vraiment dans cet article. Les faits concrets, les chiffres, les personnes impliquées. Pas une reformulation du titre — un vrai résumé du contenu.
+BLOC 1 — RESUME (5 a 7 lignes)
+Résume les faits concrets de cet article. Qui, quoi, où, chiffres précis si disponibles. Pas de reformulation du titre.
 
-BLOC 2 — EXPLICATION SIMPLE (4 a 5 lignes)
-Explique la situation comme si tu parlais à un enfant de 10 ans. Simple, clair, sans jargon. Qu'est-ce qui se passe vraiment et pourquoi c'est important ?
+BLOC 2 — EXPLICATION SIMPLE (3 a 4 lignes)
+Explique comme pour un enfant de 10 ans. Pourquoi c'est important ? Quel impact sur la vie des gens ?
 
-BLOC 3 — LE SAVIEZ-VOUS (2 a 3 lignes)
-Un fait surprenant ou peu connu directement lié au sujet de cet article.
+BLOC 3 — LE SAVIEZ-VOUS (2 lignes)
+Un seul fait surprenant et verifiable lié au sujet.
 
-Maximum 200 mots au total."""
+Maximum 180 mots."""
     else:
         prompt = f"""Tu es un journaliste expert. Date : {date_complete}.
 
 Titre : {titre}
 Source : {source}
 
-Le contenu de l'article n'est pas disponible. Basé sur ce titre et ta connaissance generale du sujet, ecris une analyse honnête en 3 blocs séparés par UNE ligne vide. Sans titres. Sans Markdown.
+Le contenu de l'article n'est pas accessible. Basé sur ta connaissance générale de ce sujet, écris une analyse honnête en 3 blocs séparés par UNE ligne vide. Sans titres. Sans Markdown.
 
-BLOC 1 (5 lignes) : Ce que ce titre annonce probablement, avec contexte général honnête.
-BLOC 2 (4 lignes) : Explication simple comme pour un enfant de 10 ans.
+BLOC 1 (5 lignes) : Contexte général de ce sujet. Sois honnête sur ce que tu sais avec certitude.
+BLOC 2 (3 lignes) : Explication simple pour un enfant de 10 ans.
 BLOC 3 (2 lignes) : Un fait surprenant lié au sujet.
 
-Précise si tu manques d'informations précises. Maximum 180 mots."""
+Maximum 150 mots. Ne pas inventer de chiffres ou de détails précis."""
 
-    analyse = groq_call(prompt, tokens=600)
+    analyse = groq_call(prompt, tokens=500)
 
     entete = f"📰 {i}/6 — {titre.upper()}\n📡 {source}"
     bloc = sep(entete) + analyse
