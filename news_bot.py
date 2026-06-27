@@ -61,20 +61,22 @@ def get_marches():
     return res
 
 feeds = [
-    ("Monde FR",    "https://news.google.com/rss/headlines/section/topic/WORLD?hl=fr&gl=FR&ceid=FR:fr"),
-    ("France",      "https://news.google.com/rss/headlines/section/topic/NATION?hl=fr&gl=FR&ceid=FR:fr"),
-    ("Economie FR", "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=fr&gl=FR&ceid=FR:fr"),
-    ("Tech FR",     "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=fr&gl=FR&ceid=FR:fr"),
-    ("Sante",       "https://news.google.com/rss/headlines/section/topic/HEALTH?hl=fr&gl=FR&ceid=FR:fr"),
-    ("Science",     "https://news.google.com/rss/headlines/section/topic/SCIENCE?hl=fr&gl=FR&ceid=FR:fr"),
-    ("Une FR",      "https://news.google.com/rss?hl=fr&gl=FR&ceid=FR:fr"),
-    ("Monde EN",    "https://news.google.com/rss/headlines/section/topic/WORLD?hl=en&gl=US&ceid=US:en"),
-    ("Finance EN",  "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en&gl=US&ceid=US:en"),
-    ("Tech EN",     "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=en&gl=US&ceid=US:en"),
+    ("Le Monde",       "https://www.lemonde.fr/rss/une.xml"),
+    ("Le Figaro",      "https://www.lefigaro.fr/rss/figaro_actualites.xml"),
+    ("France Info",    "https://www.francetvinfo.fr/titres.rss"),
+    ("BBC Monde",      "https://feeds.bbci.co.uk/news/world/rss.xml"),
+    ("Reuters",        "https://feeds.reuters.com/reuters/topNews"),
+    ("Yahoo Finance",  "https://finance.yahoo.com/news/rssindex"),
+    ("Google Monde",   "https://news.google.com/rss/headlines/section/topic/WORLD?hl=fr&gl=FR&ceid=FR:fr"),
+    ("Google Eco",     "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=fr&gl=FR&ceid=FR:fr"),
+    ("Google Tech",    "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=fr&gl=FR&ceid=FR:fr"),
+    ("Google Sante",   "https://news.google.com/rss/headlines/section/topic/HEALTH?hl=fr&gl=FR&ceid=FR:fr"),
+    ("Google Science", "https://news.google.com/rss/headlines/section/topic/SCIENCE?hl=fr&gl=FR&ceid=FR:fr"),
 ]
 
 tous_les_titres = []
 sources_map = {}
+
 for nom, feed in feeds:
     try:
         r = requests.get(feed, timeout=15, headers=H)
@@ -88,13 +90,16 @@ for nom, feed in feeds:
                     tous_les_titres.append(texte)
                     if source is not None and source.text:
                         sources_map[texte] = source.text.strip()
+                    else:
+                        sources_map[texte] = nom
     except:
         continue
 
 crypto = get_crypto()
 marches = get_marches()
 
-send(f"🗞 RAPPORT QUOTIDIEN\n📅 {date_complete}\n📰 {len(tous_les_titres)} titres collectes\n{'═'*35}")
+# Premier message : juste la date
+send(f"📅 Samuel — Daily News\n{date_complete}")
 
 selection = groq_call(f"""Voici des titres d'actualite du {date_complete}.
 Selectionne exactement 6 titres les plus importants et varies : geopolitique, economie, tech, sante, science, societe. Un seul par theme.
@@ -105,12 +110,12 @@ TITRES :
 titres = [t.strip() for t in selection.strip().split("\n") if len(t.strip()) > 20][:6]
 
 for i, titre in enumerate(titres, 1):
-    source = sources_map.get(titre, "Google News")
+    source_affichee = sources_map.get(titre, "Presse internationale")
 
     analyse = groq_call(f"""Tu es un journaliste expert. Date : {date_complete}.
 
 Sujet : {titre}
-Source : {source}
+Source : {source_affichee}
 
 Ecris une analyse courte et percutante en 3 blocs. Entre chaque bloc, laisse UNE ligne vide. Sans titres de section. Sans Markdown.
 
@@ -125,7 +130,7 @@ Un seul fait surprenant, peu connu ou contre-intuitif sur ce sujet. Quelque chos
 
 Maximum 200 mots au total. Concis, precis, interessant.""", tokens=600)
 
-    entete = f"📰 {i}/6 — {titre.upper()}\n📡 Source : {source}"
+    entete = f"📰 {i}/6 — {titre.upper()}\n📡 {source_affichee}"
     send(sep(entete) + analyse)
 
 # MARCHES
