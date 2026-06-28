@@ -29,24 +29,33 @@ def groq_call(prompt, tokens=1000):
         temperature=0.7)
     return r.choices[0].message.content
 
-def get_article_content(url):
+def get_rss_content(url):
+    """Recupere titre + description + contenu depuis le flux RSS directement"""
     try:
         r = requests.get(url, timeout=10, headers=H)
-        text = r.text
-        bloque = any(mot in text.lower() for mot in [
-            "abonnez-vous", "subscribe", "paywall", "automated traffic",
-            "access denied", "403 forbidden", "robot", "captcha",
-            "suscrib", "inicia sesion"
-        ])
-        if bloque:
-            return ""
-        text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.DOTALL)
-        text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL)
-        text = re.sub(r'<[^>]+>', ' ', text)
-        text = re.sub(r'\s+', ' ', text).strip()
-        return text[:3000]
+        root = ET.fromstring(r.content)
+        items = root.findall(".//item")
+        result = []
+        for item in items[:5]:
+            title = item.find("title")
+            desc = item.find("description")
+            content = item.find("{http://purl.org/rss/1.0/modules/content/}encoded")
+            summary = item.find("{http://www.w3.org/2005/Atom}summary")
+
+            t = title.text.strip() if title is not None and title.text else ""
+            d = ""
+            if content is not None and content.text:
+                d = re.sub(r'<[^>]+>', ' ', content.text).strip()[:2000]
+            elif summary is not None and summary.text:
+                d = re.sub(r'<[^>]+>', ' ', summary.text).strip()[:2000]
+            elif desc is not None and desc.text:
+                d = re.sub(r'<[^>]+>', ' ', desc.text).strip()[:2000]
+
+            if t and d:
+                result.append({"titre": t, "contenu": d})
+        return result
     except:
-        return ""
+        return []
 
 def get_crypto():
     try:
@@ -99,24 +108,39 @@ for nom, feed in feeds:
         r = requests.get(feed, timeout=15, headers=H)
         root = ET.fromstring(r.content)
         items = root.findall(".//item")
-        if items:
-            item = items[0]
+
+        for item in items[:3]:
             title = item.find("title")
             link = item.find("link")
             desc = item.find("description")
-            if title is not None and title.text and len(title.text.strip()) > 20:
-                lien = ""
-                if link is not None and link.text:
-                    lien = link.text.strip()
-                description = ""
-                if desc is not None and desc.text:
-                    description = re.sub(r'<[^>]+>', '', desc.text).strip()[:800]
-                articles.append({
-                    "titre": title.text.strip(),
-                    "source": nom,
-                    "lien": lien,
-                    "description": description
-                })
+            content = item.find("{http://purl.org/rss/1.0/modules/content/}encoded")
+            summary = item.find("{http://www.w3.org/2005/Atom}summary")
+
+            if title is None or not title.text or len(title.text.strip()) < 20:
+                continue
+
+            lien = ""
+            if link is not None and link.text:
+                lien = link.text.strip()
+
+            # Priorité : content:encoded > atom:summary > description
+            contexte = ""
+            if content is not None and content.text:
+                contexte = re.sub(r'<[^>]+>', ' ', content.text).strip()[:2000]
+            elif summary is not None and summary.text:
+                contexte = re.sub(r'<[^>]+>', ' ', summary.text).strip()[:2000]
+            elif desc is not None and desc.text:
+                contexte = re.sub(r'<[^>]+>', ' ', desc.text).strip()[:2000]
+
+            contexte = re.sub(r'\s+', ' ', contexte).strip()
+
+            articles.append({
+                "titre": title.text.strip(),
+                "source": nom,
+                "lien": lien,
+                "contexte": contexte
+            })
+
     except:
         continue
 
@@ -157,36 +181,25 @@ for i, art in enumerate(articles_selectionnes[:6], 1):
     titre = art["titre"]
     source = art["source"]
     lien = art["lien"]
-    description = art["description"]
+    contexte = art["contexte"]
 
-    contenu = ""
-    if lien:
-        contenu = get_article_content(lien)
-
-    if len(contenu) > 300:
-        contexte = contenu
-    elif len(description) > 100:
-        contexte = description
-    else:
-        contexte = ""
-
-    if contexte:
+    if len(contexte) > 80:
         prompt = f"""Tu es un journaliste expert. Date : {date_complete}.
 
 Titre : {titre}
 Source : {source}
-Contenu disponible (peut etre en espagnol, francais ou anglais) :
+Contenu RSS (peut etre en espagnol, francais ou anglais) :
 {contexte}
 
-IMPORTANT : Reponds toujours en FRANCAIS, peu importe la langue du contenu.
+Reponds TOUJOURS en FRANCAIS.
 
-Ecris une analyse en 3 blocs séparés par UNE ligne vide. Sans titres de section. Sans Markdown.
+Ecris une analyse en 3 blocs séparés par UNE ligne vide. Sans titres. Sans Markdown.
 
 BLOC 1 — RESUME (5 a 7 lignes)
-Résume les faits concrets de cet article. Qui, quoi, où, chiffres précis si disponibles. Pas de reformulation du titre.
+Résume les faits concrets de ce contenu. Chiffres, noms, dates si disponibles. Ne reformule pas le titre.
 
 BLOC 2 — EXPLICATION SIMPLE (3 a 4 lignes)
-Explique comme pour un enfant de 10 ans. Pourquoi c'est important ? Quel impact sur la vie des gens ?
+Explique comme pour un enfant de 10 ans. Pourquoi c'est important ?
 
 BLOC 3 — LE SAVIEZ-VOUS (2 lignes)
 Un seul fait surprenant et verifiable lié au sujet.
@@ -198,13 +211,13 @@ Maximum 180 mots."""
 Titre : {titre}
 Source : {source}
 
-Le contenu de l'article n'est pas accessible. Basé sur ta connaissance générale de ce sujet, écris une analyse honnête en FRANCAIS en 3 blocs séparés par UNE ligne vide. Sans titres. Sans Markdown.
+Pas de contenu disponible. Reponds en FRANCAIS en 3 blocs séparés par UNE ligne vide. Sans titres. Sans Markdown.
 
-BLOC 1 (5 lignes) : Contexte général de ce sujet. Sois honnête sur ce que tu sais avec certitude.
+BLOC 1 (4 lignes) : Ce que ce titre annonce, avec contexte général honnête. Précise que tu n'as pas l'article complet.
 BLOC 2 (3 lignes) : Explication simple pour un enfant de 10 ans.
 BLOC 3 (2 lignes) : Un fait surprenant lié au sujet.
 
-Maximum 150 mots. Ne pas inventer de chiffres ou de détails précis."""
+Maximum 150 mots. Ne pas inventer de chiffres précis."""
 
     analyse = groq_call(prompt, tokens=500)
 
