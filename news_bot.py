@@ -33,7 +33,6 @@ def get_article_content(url):
     try:
         r = requests.get(url, timeout=10, headers=H)
         text = r.text
-        # Détecte les paywalls et blocages
         bloque = any(mot in text.lower() for mot in [
             "abonnez-vous", "subscribe", "paywall", "automated traffic",
             "access denied", "403 forbidden", "robot", "captcha"
@@ -80,18 +79,18 @@ def get_marches():
     return res
 
 feeds = [
-    ("Le Monde",       "https://www.lemonde.fr/rss/une.xml"),
-    ("Le Figaro",      "https://www.lefigaro.fr/rss/figaro_actualites.xml"),
-    ("France Info",    "https://www.francetvinfo.fr/titres.rss"),
-    ("BBC World",      "https://feeds.bbci.co.uk/news/world/rss.xml"),
-    ("Reuters",        "https://feeds.reuters.com/reuters/topNews"),
-    ("Yahoo Finance",  "https://finance.yahoo.com/news/rssindex"),
-    ("RFI",            "https://www.rfi.fr/fr/rss"),
-    ("Les Echos",      "https://feeds.lesechos.fr/lesechos-unes"),
-    ("Der Spiegel EN", "https://www.spiegel.de/international/index.rss"),
-    ("The Guardian",   "https://www.theguardian.com/world/rss"),
-    ("El Pais EN",     "https://feeds.elpais.com/mrss-s/pages/ep/site/english.elpais.com/portada"),
-    ("Liberation",     "https://www.liberation.fr/arc/outboundfeeds/rss/"),
+    ("Le Monde",      "https://www.lemonde.fr/rss/une.xml"),
+    ("Le Figaro",     "https://www.lefigaro.fr/rss/figaro_actualites.xml"),
+    ("France Info",   "https://www.francetvinfo.fr/titres.rss"),
+    ("BBC World",     "https://feeds.bbci.co.uk/news/world/rss.xml"),
+    ("Reuters",       "https://feeds.reuters.com/reuters/topNews"),
+    ("Yahoo Finance", "https://finance.yahoo.com/news/rssindex"),
+    ("RFI",           "https://www.rfi.fr/fr/rss"),
+    ("Les Echos",     "https://feeds.lesechos.fr/lesechos-unes"),
+    ("La Vanguardia", "https://www.lavanguardia.com/rss/home.xml"),
+    ("The Guardian",  "https://www.theguardian.com/world/rss"),
+    ("Al Jazeera",    "https://www.aljazeera.com/xml/rss/all.xml"),
+    ("Liberation",    "https://www.liberation.fr/arc/outboundfeeds/rss/"),
 ]
 
 articles = []
@@ -165,16 +164,12 @@ for i, art in enumerate(articles_selectionnes[:6], 1):
     if lien:
         contenu = get_article_content(lien)
 
-    # Choisit la meilleure source de contenu disponible
     if len(contenu) > 300:
         contexte = contenu
-        source_contexte = "contenu complet de l'article"
     elif len(description) > 100:
         contexte = description
-        source_contexte = "description de l'article"
     else:
         contexte = ""
-        source_contexte = ""
 
     if contexte:
         prompt = f"""Tu es un journaliste expert. Date : {date_complete}.
