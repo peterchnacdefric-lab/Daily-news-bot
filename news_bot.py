@@ -35,7 +35,8 @@ def get_article_content(url):
         text = r.text
         bloque = any(mot in text.lower() for mot in [
             "abonnez-vous", "subscribe", "paywall", "automated traffic",
-            "access denied", "403 forbidden", "robot", "captcha"
+            "access denied", "403 forbidden", "robot", "captcha",
+            "suscrib", "inicia sesion"
         ])
         if bloque:
             return ""
@@ -174,8 +175,10 @@ for i, art in enumerate(articles_selectionnes[:6], 1):
 
 Titre : {titre}
 Source : {source}
-Contenu disponible :
+Contenu disponible (peut etre en espagnol, francais ou anglais) :
 {contexte}
+
+IMPORTANT : Reponds toujours en FRANCAIS, peu importe la langue du contenu.
 
 Ecris une analyse en 3 blocs séparés par UNE ligne vide. Sans titres de section. Sans Markdown.
 
@@ -195,7 +198,7 @@ Maximum 180 mots."""
 Titre : {titre}
 Source : {source}
 
-Le contenu de l'article n'est pas accessible. Basé sur ta connaissance générale de ce sujet, écris une analyse honnête en 3 blocs séparés par UNE ligne vide. Sans titres. Sans Markdown.
+Le contenu de l'article n'est pas accessible. Basé sur ta connaissance générale de ce sujet, écris une analyse honnête en FRANCAIS en 3 blocs séparés par UNE ligne vide. Sans titres. Sans Markdown.
 
 BLOC 1 (5 lignes) : Contexte général de ce sujet. Sois honnête sur ce que tu sais avec certitude.
 BLOC 2 (3 lignes) : Explication simple pour un enfant de 10 ans.
