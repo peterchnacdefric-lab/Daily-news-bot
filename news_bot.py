@@ -83,13 +83,11 @@ feeds = [
     ("Le Figaro",     "https://www.lefigaro.fr/rss/figaro_actualites.xml"),
     ("France Info",   "https://www.francetvinfo.fr/titres.rss"),
     ("BBC World",     "https://feeds.bbci.co.uk/news/world/rss.xml"),
-    ("Reuters",       "https://feeds.reuters.com/reuters/topNews"),
     ("Yahoo Finance", "https://finance.yahoo.com/news/rssindex"),
     ("RFI",           "https://www.rfi.fr/fr/rss"),
     ("Les Echos",     "https://feeds.lesechos.fr/lesechos-unes"),
     ("La Vanguardia", "https://www.lavanguardia.com/rss/home.xml"),
     ("The Guardian",  "https://www.theguardian.com/world/rss"),
-    ("Al Jazeera",    "https://www.aljazeera.com/xml/rss/all.xml"),
     ("Liberation",    "https://www.liberation.fr/arc/outboundfeeds/rss/"),
 ]
 
