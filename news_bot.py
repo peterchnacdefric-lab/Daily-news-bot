@@ -67,10 +67,10 @@ feeds = [
     ("BBC World",     "https://feeds.bbci.co.uk/news/world/rss.xml"),
     ("RFI",           "https://www.rfi.fr/fr/rss"),
     ("Les Echos",     "https://feeds.lesechos.fr/lesechos-unes"),
-    ("MarketWatch",   "https://feeds.marketwatch.com/marketwatch/topstories/"),
     ("La Vanguardia", "https://www.lavanguardia.com/rss/home.xml"),
     ("The Guardian",  "https://www.theguardian.com/world/rss"),
     ("Liberation",    "https://www.liberation.fr/arc/outboundfeeds/rss/"),
+    ("BBC Business",  "https://feeds.bbci.co.uk/news/business/rss.xml"),
 ]
 
 articles = []
@@ -122,7 +122,7 @@ titres_pour_selection = "\n".join([f"[{a['source']}] {a['titre']}" for a in arti
 
 selection = groq_call(f"""Voici des titres d'actualite du {date_complete}, chacun avec sa source.
 
-Selectionne exactement 6 titres les plus importants et varies : geopolitique, economie, tech, sante, science, societe. Un seul par theme.
+Selectionne exactement 6 titres les plus importants et varies : geopolitique, economie mondiale, tech, sante, science, societe. Un seul par theme.
 
 Reponds UNIQUEMENT avec les 6 titres selectionnes, un par ligne, exactement comme ils sont ecrits, sans numero ni commentaire.
 
@@ -157,7 +157,7 @@ for i, art in enumerate(articles_selectionnes[:6], 1):
 
 Titre : {titre}
 Source : {source}
-Contenu RSS (peut etre en espagnol, francais ou anglais) :
+Contenu RSS :
 {contexte}
 
 Reponds TOUJOURS en FRANCAIS.
@@ -165,7 +165,7 @@ Reponds TOUJOURS en FRANCAIS.
 Ecris une analyse en 3 blocs séparés par UNE ligne vide. Sans titres. Sans Markdown.
 
 BLOC 1 — RESUME (5 a 7 lignes)
-Résume les faits concrets de ce contenu. Chiffres, noms, dates si disponibles. Ne reformule pas le titre.
+Résume les faits concrets. Chiffres, noms, dates si disponibles. Ne reformule pas le titre.
 
 BLOC 2 — EXPLICATION SIMPLE (3 a 4 lignes)
 Explique comme pour un enfant de 10 ans. Pourquoi c'est important ?
@@ -182,7 +182,7 @@ Source : {source}
 
 Pas de contenu disponible. Reponds en FRANCAIS en 3 blocs séparés par UNE ligne vide. Sans titres. Sans Markdown.
 
-BLOC 1 (4 lignes) : Ce que ce titre annonce, avec contexte général honnête. Précise que tu n'as pas l'article complet.
+BLOC 1 (4 lignes) : Ce que ce titre annonce, contexte général honnête.
 BLOC 2 (3 lignes) : Explication simple pour un enfant de 10 ans.
 BLOC 3 (2 lignes) : Un fait surprenant lié au sujet.
 
@@ -196,6 +196,7 @@ Maximum 150 mots. Ne pas inventer de chiffres précis."""
         bloc += f"\n\n🔗 {lien}"
     send(bloc)
 
+# MARCHES
 if marches:
     texte_marches = sep("📈 MARCHES — DONNEES EN TEMPS REEL")
     for nom, d in marches.items():
@@ -203,6 +204,7 @@ if marches:
         texte_marches += f"{emoji} {nom} : {d['prix']:.2f} ({d['change']:+.2f}%)\n"
     send(texte_marches)
 
+# CRYPTO
 if crypto:
     btc = crypto.get("bitcoin", {})
     eth = crypto.get("ethereum", {})
@@ -220,12 +222,46 @@ if crypto:
     )
     send(sep("₿ CRYPTO — DONNEES EN TEMPS REEL") + donnees_crypto)
 
+# CONSEIL INVESTISSEMENT
 titres_analyses = [a["titre"] for a in articles_selectionnes[:6]]
+marches_texte = ""
+if marches:
+    for nom, d in marches.items():
+        marches_texte += f"{nom} : {d['prix']:.2f} ({d['change']:+.2f}%)\n"
+
+invest = groq_call(f"""Tu es un analyste financier mondial expert. Date : {date_complete}.
+
+Actualites du jour :
+{chr(10).join(titres_analyses)}
+
+Marches en temps reel :
+{marches_texte}
+
+Ecris un conseil d'investissement en 4 blocs séparés par UNE ligne vide. Sans titres. Sans Markdown. En FRANCAIS.
+
+BLOC 1 — LA NEWS ECONOMIQUE DU JOUR (4 lignes)
+Quelle est la tendance economique mondiale la plus importante aujourd'hui ? Basee sur les actualites et les marches reels.
+
+BLOC 2 — OU INVESTIR AUJOURD'HUI (4 lignes)
+1 secteur ou actif precis a surveiller aujourd'hui et pourquoi. Lie directement aux actualites du jour. Sois concret.
+
+BLOC 3 — CONTEXTE ET RISQUES (3 lignes)
+Pourquoi ce choix ? Quels sont les risques reels ?
+
+BLOC 4 — FUN FACT FINANCE (2 lignes)
+Un fait surprenant sur les marches ou l'investissement que la plupart des gens ignorent.
+
+Termine par : Ceci est une analyse pedagogique, pas un conseil financier professionnel.
+Maximum 200 mots.""", tokens=600)
+
+send(sep("💼 ECONOMIE & INVESTISSEMENT DU JOUR") + invest)
+
+# SYNTHESE
 synthese = groq_call(f"""Date : {date_complete}
 Sujets du jour :
 {chr(10).join(titres_analyses)}
 
 Synthese de 5 lignes maximum. Lecture transversale du monde aujourd'hui.
-Termine par une phrase forte. Sans Markdown.""", tokens=200)
+Termine par une phrase forte. Sans Markdown. En FRANCAIS.""", tokens=200)
 
 send(sep("📊 SYNTHESE DU JOUR") + synthese + f"\n\n{'═'*35}\n🗞 Fin du rapport — {date_complete}")
