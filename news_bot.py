@@ -222,14 +222,20 @@ if crypto:
     )
     send(sep("₿ CRYPTO — DONNEES EN TEMPS REEL") + donnees_crypto)
 
-# CONSEIL INVESTISSEMENT
+# INVESTISSEMENT
 titres_analyses = [a["titre"] for a in articles_selectionnes[:6]]
 marches_texte = ""
 if marches:
     for nom, d in marches.items():
         marches_texte += f"{nom} : {d['prix']:.2f} ({d['change']:+.2f}%)\n"
 
-invest = groq_call(f"""Tu es un analyste financier mondial expert. Date : {date_complete}.
+crypto_texte = ""
+if crypto:
+    btc = crypto.get("bitcoin", {})
+    eth = crypto.get("ethereum", {})
+    crypto_texte = f"Bitcoin : ${btc.get('usd',0):,.0f} ({btc.get('usd_24h_change',0):+.2f}%)\nEthereum : ${eth.get('usd',0):,.0f} ({eth.get('usd_24h_change',0):+.2f}%)"
+
+invest = groq_call(f"""Tu es un analyste financier mondial senior. Date : {date_complete}.
 
 Actualites du jour :
 {chr(10).join(titres_analyses)}
@@ -237,24 +243,32 @@ Actualites du jour :
 Marches en temps reel :
 {marches_texte}
 
-Ecris un conseil d'investissement en 4 blocs séparés par UNE ligne vide. Sans titres. Sans Markdown. En FRANCAIS.
+Crypto en temps reel :
+{crypto_texte}
 
-BLOC 1 — LA NEWS ECONOMIQUE DU JOUR (4 lignes)
-Quelle est la tendance economique mondiale la plus importante aujourd'hui ? Basee sur les actualites et les marches reels.
+Ecris une analyse d'investissement en 5 blocs séparés par UNE ligne vide. Sans titres. Sans Markdown. En FRANCAIS.
 
-BLOC 2 — OU INVESTIR AUJOURD'HUI (4 lignes)
-1 secteur ou actif precis a surveiller aujourd'hui et pourquoi. Lie directement aux actualites du jour. Sois concret.
+BLOC 1 — TENDANCE ECONOMIQUE MONDIALE (3 lignes)
+Quelle est la tendance economique dominante aujourd'hui dans le monde ? Basee sur les actualites et les marches reels ci-dessus.
 
-BLOC 3 — CONTEXTE ET RISQUES (3 lignes)
-Pourquoi ce choix ? Quels sont les risques reels ?
+BLOC 2 — ACTION A SURVEILLER (4 lignes)
+Cite UNE action cotee en bourse precise (avec son ticker boursier entre parentheses, ex: TotalEnergies (TTE.PA), LVMH (MC.PA), Apple (AAPL), Airbus (AIR.PA)). Explique pourquoi cette action est interessante AUJOURD'HUI specifiquement, en lien direct avec les actualites du jour.
 
-BLOC 4 — FUN FACT FINANCE (2 lignes)
+BLOC 3 — SECTEUR OU ACTIF ALTERNATIF (3 lignes)
+Un secteur ou actif supplementaire a surveiller aujourd'hui (ETF, matieres premieres, obligations, crypto). Concret et argumente.
+
+BLOC 4 — RISQUES A CONNAITRE (3 lignes)
+Les 2 ou 3 risques concrets qui pourraient faire baisser ces investissements aujourd'hui.
+
+BLOC 5 — FUN FACT FINANCE (2 lignes)
 Un fait surprenant sur les marches ou l'investissement que la plupart des gens ignorent.
 
-Termine par : Ceci est une analyse pedagogique, pas un conseil financier professionnel.
-Maximum 200 mots.""", tokens=600)
+IMPORTANT : Cite des noms d'entreprises et tickers reels. Sois precis et concret.
+Termine par : Analyse pedagogique uniquement, pas un conseil financier professionnel. Fais tes propres recherches.
 
-send(sep("💼 ECONOMIE & INVESTISSEMENT DU JOUR") + invest)
+Maximum 250 mots.""", tokens=700)
+
+send(sep("💼 INVESTISSEMENT DU JOUR") + invest)
 
 # SYNTHESE
 synthese = groq_call(f"""Date : {date_complete}
