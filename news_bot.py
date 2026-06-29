@@ -29,34 +29,6 @@ def groq_call(prompt, tokens=1000):
         temperature=0.7)
     return r.choices[0].message.content
 
-def get_rss_content(url):
-    """Recupere titre + description + contenu depuis le flux RSS directement"""
-    try:
-        r = requests.get(url, timeout=10, headers=H)
-        root = ET.fromstring(r.content)
-        items = root.findall(".//item")
-        result = []
-        for item in items[:5]:
-            title = item.find("title")
-            desc = item.find("description")
-            content = item.find("{http://purl.org/rss/1.0/modules/content/}encoded")
-            summary = item.find("{http://www.w3.org/2005/Atom}summary")
-
-            t = title.text.strip() if title is not None and title.text else ""
-            d = ""
-            if content is not None and content.text:
-                d = re.sub(r'<[^>]+>', ' ', content.text).strip()[:2000]
-            elif summary is not None and summary.text:
-                d = re.sub(r'<[^>]+>', ' ', summary.text).strip()[:2000]
-            elif desc is not None and desc.text:
-                d = re.sub(r'<[^>]+>', ' ', desc.text).strip()[:2000]
-
-            if t and d:
-                result.append({"titre": t, "contenu": d})
-        return result
-    except:
-        return []
-
 def get_crypto():
     try:
         r = requests.get(
@@ -93,9 +65,9 @@ feeds = [
     ("Le Figaro",     "https://www.lefigaro.fr/rss/figaro_actualites.xml"),
     ("France Info",   "https://www.francetvinfo.fr/titres.rss"),
     ("BBC World",     "https://feeds.bbci.co.uk/news/world/rss.xml"),
-    ("Yahoo Finance", "https://finance.yahoo.com/news/rssindex"),
     ("RFI",           "https://www.rfi.fr/fr/rss"),
     ("Les Echos",     "https://feeds.lesechos.fr/lesechos-unes"),
+    ("MarketWatch",   "https://feeds.marketwatch.com/marketwatch/topstories/"),
     ("La Vanguardia", "https://www.lavanguardia.com/rss/home.xml"),
     ("The Guardian",  "https://www.theguardian.com/world/rss"),
     ("Liberation",    "https://www.liberation.fr/arc/outboundfeeds/rss/"),
@@ -108,7 +80,6 @@ for nom, feed in feeds:
         r = requests.get(feed, timeout=15, headers=H)
         root = ET.fromstring(r.content)
         items = root.findall(".//item")
-
         for item in items[:3]:
             title = item.find("title")
             link = item.find("link")
@@ -123,7 +94,6 @@ for nom, feed in feeds:
             if link is not None and link.text:
                 lien = link.text.strip()
 
-            # Priorité : content:encoded > atom:summary > description
             contexte = ""
             if content is not None and content.text:
                 contexte = re.sub(r'<[^>]+>', ' ', content.text).strip()[:2000]
@@ -140,7 +110,6 @@ for nom, feed in feeds:
                 "lien": lien,
                 "contexte": contexte
             })
-
     except:
         continue
 
