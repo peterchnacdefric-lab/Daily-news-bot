@@ -25,7 +25,7 @@ def groq_call(prompt, tokens=1000):
     time.sleep(3)
     c = Groq(api_key=GROQ_KEY)
     r = c.chat.completions.create(
-        model="llama-3.1-8b-instant",
+        model="openai/gpt-oss-20b",
         messages=[{"role": "user", "content": prompt}],
         max_tokens=tokens,
         temperature=0.7
@@ -51,6 +51,7 @@ def get_marches():
         "Or": "GC%3DF",
         "EUR/USD": "EURUSD%3DX"
     }
+
     for nom, s in symboles.items():
         try:
             r = requests.get(
@@ -61,12 +62,14 @@ def get_marches():
             d = r.json()["chart"]["result"][0]["meta"]
             prix = d["regularMarketPrice"]
             prev = d["previousClose"]
+
             res[nom] = {
                 "prix": prix,
                 "change": ((prix - prev) / prev) * 100
             }
         except:
             continue
+
     return res
 
 feeds = [
@@ -103,6 +106,7 @@ for nom, feed in feeds:
                 continue
 
             lien = ""
+
             if link is not None and link.text:
                 lien = link.text.strip()
 
