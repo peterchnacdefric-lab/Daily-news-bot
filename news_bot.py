@@ -8,20 +8,31 @@ GROQ_KEY = os.environ["GROQ_KEY"]
 
 now = datetime.now()
 date_complete = now.strftime("%A %d %B %Y")
-H = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+H = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+}
+
 
 def send(text):
     for i in range(0, len(text), 4000):
         requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            json={"chat_id": CHAT_ID, "text": text[i:i+4000]}
+            json={
+                "chat_id": CHAT_ID,
+                "text": text[i:i+4000]
+            }
         )
         time.sleep(0.5)
+
 
 def sep(titre):
     return f"\n\n{'═'*35}\n{titre}\n{'═'*35}\n\n"
 
+
 def groq_call(prompt, tokens=1000):
+    last_error = None
+
     for attempt in range(3):
         try:
             time.sleep(3)
@@ -37,7 +48,7 @@ def groq_call(prompt, tokens=1000):
                     }
                 ],
                 max_tokens=tokens,
-                temperature=0.7
+                temperature=0.5
             )
 
             content = r.choices[0].message.content
@@ -46,24 +57,133 @@ def groq_call(prompt, tokens=1000):
                 return content.strip()
 
         except Exception as e:
-            if attempt == 2:
-                raise e
+            last_error = e
 
         time.sleep(5)
 
-    return "Aucune analyse disponible aujourd'hui."
+    if last_error:
+        raise last_error
+
+    return ""
+
+
+def analyse_article(titre, source, contexte):
+
+    if len(contexte) > 80:
+
+        prompt = f"""Tu es journaliste.
+
+Date : {date_complete}
+
+Titre : {titre}
+Source : {source}
+
+Contenu :
+{contexte}
+
+Réponds uniquement en français.
+
+Fais une analyse courte en 3 paragraphes.
+
+Premier paragraphe :
+résume les faits importants en 4 à 5 lignes.
+
+Deuxième paragraphe :
+explique simplement pourquoi cette information est importante en 3 lignes.
+
+Troisième paragraphe :
+donne un fait intéressant et vérifiable lié au sujet en 2 lignes.
+
+Maximum 150 mots.
+
+N'utilise aucun titre.
+N'utilise pas de Markdown."""
+
+    else:
+
+        prompt = f"""Tu es journaliste.
+
+Date : {date_complete}
+
+Titre : {titre}
+Source : {source}
+
+Le contenu détaillé n'est pas disponible.
+
+Explique cette actualité en français.
+
+Fais 3 courts paragraphes :
+
+1. Ce que l'on sait et ce que le titre annonce.
+2. Pourquoi cette actualité est importante.
+3. Un fait intéressant lié au sujet.
+
+Maximum 120 mots.
+
+Ne pas inventer de chiffres ou de faits précis.
+N'utilise aucun titre.
+N'utilise pas de Markdown."""
+
+    try:
+
+        resultat = groq_call(
+            prompt,
+            tokens=400
+        )
+
+        if resultat and len(resultat.strip()) > 30:
+            return resultat.strip()
+
+    except:
+        pass
+
+    # FALLBACK
+    try:
+
+        fallback = groq_call(
+            f"""Explique en français cette actualité en environ 100 mots.
+
+Titre : {titre}
+Source : {source}
+
+Donne uniquement une explication claire et factuelle.""",
+            tokens=250
+        )
+
+        if fallback and len(fallback.strip()) > 20:
+            return fallback.strip()
+
+    except:
+        pass
+
+    return (
+        f"Cette actualité concerne : {titre}. "
+        f"La source indiquée est {source}. "
+        f"Le contenu détaillé n'a pas pu être analysé automatiquement."
+    )
+
 
 def get_crypto():
+
     try:
+
         r = requests.get(
-            "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true",
+            "https://api.coingecko.com/api/v3/simple/price"
+            "?ids=bitcoin,ethereum,solana"
+            "&vs_currencies=usd"
+            "&include_24hr_change=true",
             timeout=10
         )
+
         return r.json()
+
     except:
+
         return None
 
+
 def get_marches():
+
     res = {}
 
     symboles = {
@@ -74,28 +194,32 @@ def get_marches():
         "EUR/USD": "EURUSD%3DX"
     }
 
-    for nom, s in symboles.items():
+    for nom, symbole in symboles.items():
+
         try:
+
             r = requests.get(
-                f"https://query1.finance.yahoo.com/v8/finance/chart/{s}?interval=1d&range=2d",
+                f"https://query1.finance.yahoo.com/v8/finance/chart/{symbole}?interval=1d&range=2d",
                 timeout=10,
                 headers=H
             )
 
-            d = r.json()["chart"]["result"][0]["meta"]
+            data = r.json()["chart"]["result"][0]["meta"]
 
-            prix = d["regularMarketPrice"]
-            prev = d["previousClose"]
+            prix = data["regularMarketPrice"]
+            previous = data["previousClose"]
 
             res[nom] = {
                 "prix": prix,
-                "change": ((prix - prev) / prev) * 100
+                "change": ((prix - previous) / previous) * 100
             }
 
         except:
+
             continue
 
     return res
+
 
 feeds = [
     ("Le Monde", "https://www.lemonde.fr/rss/une.xml"),
@@ -107,13 +231,17 @@ feeds = [
     ("La Vanguardia", "https://www.lavanguardia.com/rss/home.xml"),
     ("The Guardian", "https://www.theguardian.com/world/rss"),
     ("Liberation", "https://www.liberation.fr/arc/outboundfeeds/rss/"),
-    ("BBC Business", "https://feeds.bbci.co.uk/news/business/rss.xml"),
+    ("BBC Business", "https://feeds.bbci.co.uk/news/business/rss.xml")
 ]
+
 
 articles = []
 
+
 for nom, feed in feeds:
+
     try:
+
         r = requests.get(
             feed,
             timeout=15,
@@ -141,7 +269,9 @@ for nom, feed in feeds:
             if title is None or not title.text:
                 continue
 
-            if len(title.text.strip()) < 20:
+            titre = title.text.strip()
+
+            if len(titre) < 20:
                 continue
 
             lien = ""
@@ -154,49 +284,55 @@ for nom, feed in feeds:
             if content is not None and content.text:
 
                 contexte = re.sub(
-                    r'<[^>]+>',
-                    ' ',
+                    r"<[^>]+>",
+                    " ",
                     content.text
-                ).strip()[:2000]
+                )
 
             elif summary is not None and summary.text:
 
                 contexte = re.sub(
-                    r'<[^>]+>',
-                    ' ',
+                    r"<[^>]+>",
+                    " ",
                     summary.text
-                ).strip()[:2000]
+                )
 
             elif desc is not None and desc.text:
 
                 contexte = re.sub(
-                    r'<[^>]+>',
-                    ' ',
+                    r"<[^>]+>",
+                    " ",
                     desc.text
-                ).strip()[:2000]
+                )
 
             contexte = re.sub(
-                r'\s+',
-                ' ',
+                r"\s+",
+                " ",
                 contexte
             ).strip()
 
+            contexte = contexte[:2000]
+
             articles.append({
-                "titre": title.text.strip(),
+                "titre": titre,
                 "source": nom,
                 "lien": lien,
                 "contexte": contexte
             })
 
     except:
+
         continue
+
 
 crypto = get_crypto()
 marches = get_marches()
 
+
 send(
     f"📅 Samuel — Daily News\n{date_complete}"
 )
+
 
 titres_pour_selection = "\n".join(
     [
@@ -205,144 +341,84 @@ titres_pour_selection = "\n".join(
     ]
 )
 
+
 selection = groq_call(
-    f"""Voici des titres d'actualite du {date_complete}, chacun avec sa source.
+    f"""Voici des titres d'actualité du {date_complete}.
 
-Selectionne exactement 6 titres les plus importants et varies : geopolitique, economie mondiale, tech, sante, science, societe.
+Sélectionne exactement 6 titres importants et variés.
 
-Un seul par theme.
+Essaie de couvrir :
+- géopolitique
+- économie
+- technologie
+- santé ou science
+- société
+- environnement
 
-Reponds UNIQUEMENT avec les 6 titres selectionnes, un par ligne, exactement comme ils sont ecrits, sans numero ni commentaire.
+Un seul titre par thème si possible.
+
+Réponds uniquement avec les 6 titres.
+Un titre par ligne.
+Copie les titres exactement.
 
 TITRES :
 
 {titres_pour_selection}""",
-    tokens=500
+    tokens=400
 )
 
+
 lignes_selectionnees = [
-    l.strip()
-    for l in selection.split("\n")
-    if len(l.strip()) > 20
+    ligne.strip()
+    for ligne in selection.split("\n")
+    if len(ligne.strip()) > 20
 ][:6]
+
 
 articles_selectionnes = []
 
+
 for ligne in lignes_selectionnees:
 
-    for a in articles:
+    for article in articles:
 
         if (
-            a["titre"] in ligne
-            or ligne in a["titre"]
+            article["titre"] in ligne
+            or ligne in article["titre"]
         ):
 
-            if a not in articles_selectionnes:
-                articles_selectionnes.append(a)
+            if article not in articles_selectionnes:
+                articles_selectionnes.append(article)
 
             break
 
+
 if len(articles_selectionnes) < 6:
 
-    for a in articles:
+    for article in articles:
 
-        if a not in articles_selectionnes:
-            articles_selectionnes.append(a)
+        if article not in articles_selectionnes:
+
+            articles_selectionnes.append(article)
 
         if len(articles_selectionnes) >= 6:
             break
 
-for i, art in enumerate(
+
+for i, article in enumerate(
     articles_selectionnes[:6],
     1
 ):
 
-    titre = art["titre"]
-    source = art["source"]
-    lien = art["lien"]
-    contexte = art["contexte"]
+    titre = article["titre"]
+    source = article["source"]
+    lien = article["lien"]
+    contexte = article["contexte"]
 
-    if len(contexte) > 80:
-
-        prompt = f"""Tu es un journaliste expert.
-
-Date : {date_complete}
-
-Titre : {titre}
-
-Source : {source}
-
-Contenu RSS :
-{contexte}
-
-Reponds TOUJOURS en FRANCAIS.
-
-Ecris une analyse en 3 blocs séparés par UNE ligne vide.
-
-Sans titres.
-Sans Markdown.
-
-BLOC 1 — RESUME
-5 a 7 lignes.
-
-Résume les faits concrets.
-Chiffres, noms, dates si disponibles.
-Ne reformule pas simplement le titre.
-
-BLOC 2 — EXPLICATION SIMPLE
-3 a 4 lignes.
-
-Explique comme pour un enfant de 10 ans.
-Pourquoi c'est important ?
-
-BLOC 3 — LE SAVIEZ-VOUS
-2 lignes.
-
-Un seul fait surprenant et verifiable lié au sujet.
-
-Maximum 180 mots.
-
-IMPORTANT :
-Tu dois impérativement produire une réponse textuelle."""
-
-    else:
-
-        prompt = f"""Tu es un journaliste expert.
-
-Date : {date_complete}
-
-Titre : {titre}
-
-Source : {source}
-
-Pas de contenu disponible.
-
-Reponds en FRANCAIS.
-
-Ecris exactement 3 blocs séparés par UNE ligne vide.
-
-Sans titres.
-Sans Markdown.
-
-BLOC 1 :
-4 lignes expliquant ce que ce titre annonce et son contexte général.
-
-BLOC 2 :
-3 lignes expliquant simplement le sujet comme pour un enfant de 10 ans.
-
-BLOC 3 :
-2 lignes avec un fait surprenant lié au sujet.
-
-Maximum 150 mots.
-
-Ne pas inventer de chiffres précis.
-
-IMPORTANT :
-Tu dois impérativement produire une réponse textuelle."""
-
-    analyse = groq_call(
-        prompt,
-        tokens=500
+    analyse = analyse_article(
+        titre,
+        source,
+        contexte
     )
 
     entete = (
@@ -353,9 +429,11 @@ Tu dois impérativement produire une réponse textuelle."""
     bloc = sep(entete) + analyse
 
     if lien:
+
         bloc += f"\n\n🔗 {lien}"
 
     send(bloc)
+
 
 # MARCHES
 
@@ -365,40 +443,30 @@ if marches:
         "📈 MARCHES — DONNEES EN TEMPS REEL"
     )
 
-    for nom, d in marches.items():
+    for nom, data in marches.items():
 
         emoji = (
             "🟢"
-            if d["change"] > 0
+            if data["change"] > 0
             else "🔴"
         )
 
         texte_marches += (
             f"{emoji} {nom} : "
-            f"{d['prix']:.2f} "
-            f"({d['change']:+.2f}%)\n"
+            f"{data['prix']:.2f} "
+            f"({data['change']:+.2f}%)\n"
         )
 
     send(texte_marches)
+
 
 # CRYPTO
 
 if crypto:
 
-    btc = crypto.get(
-        "bitcoin",
-        {}
-    )
-
-    eth = crypto.get(
-        "ethereum",
-        {}
-    )
-
-    sol = crypto.get(
-        "solana",
-        {}
-    )
+    btc = crypto.get("bitcoin", {})
+    eth = crypto.get("ethereum", {})
+    sol = crypto.get("solana", {})
 
     btc_e = (
         "🟢"
@@ -431,7 +499,7 @@ if crypto:
         f"${sol.get('usd', 0):,.0f} "
         f"({sol.get('usd_24h_change', 0):+.2f}%)\n\n"
 
-        f"Source : CoinGecko"
+        "Source : CoinGecko"
     )
 
     send(
@@ -441,156 +509,127 @@ if crypto:
         + donnees_crypto
     )
 
+
 # INVESTISSEMENT
 
 titres_analyses = [
-    a["titre"]
-    for a in articles_selectionnes[:6]
+    article["titre"]
+    for article in articles_selectionnes[:6]
 ]
+
 
 marches_texte = ""
 
 if marches:
 
-    for nom, d in marches.items():
+    for nom, data in marches.items():
 
         marches_texte += (
             f"{nom} : "
-            f"{d['prix']:.2f} "
-            f"({d['change']:+.2f}%)\n"
+            f"{data['prix']:.2f} "
+            f"({data['change']:+.2f}%)\n"
         )
+
 
 crypto_texte = ""
 
 if crypto:
 
-    btc = crypto.get(
-        "bitcoin",
-        {}
-    )
-
-    eth = crypto.get(
-        "ethereum",
-        {}
-    )
+    btc = crypto.get("bitcoin", {})
+    eth = crypto.get("ethereum", {})
 
     crypto_texte = (
         f"Bitcoin : "
-        f"${btc.get('usd',0):,.0f} "
-        f"({btc.get('usd_24h_change',0):+.2f}%)\n"
+        f"${btc.get('usd', 0):,.0f} "
+        f"({btc.get('usd_24h_change', 0):+.2f}%)\n"
 
         f"Ethereum : "
-        f"${eth.get('usd',0):,.0f} "
-        f"({eth.get('usd_24h_change',0):+.2f}%)"
+        f"${eth.get('usd', 0):,.0f} "
+        f"({eth.get('usd_24h_change', 0):+.2f}%)"
     )
 
-invest = groq_call(
-    f"""Tu es un analyste financier mondial senior.
+
+try:
+
+    invest = groq_call(
+        f"""Tu es un analyste financier.
 
 Date : {date_complete}
 
-Actualites du jour :
-
+Actualités :
 {chr(10).join(titres_analyses)}
 
-Marches en temps reel :
-
+Marchés :
 {marches_texte}
 
-Crypto en temps reel :
-
+Crypto :
 {crypto_texte}
 
-Ecris une analyse d'investissement en 5 blocs séparés par UNE ligne vide.
+Réponds en français.
 
-Sans titres.
-Sans Markdown.
-En FRANCAIS.
+Donne 5 courts paragraphes :
 
-BLOC 1 — TENDANCE ECONOMIQUE MONDIALE
-3 lignes.
+1. Tendance économique mondiale aujourd'hui.
+2. Une action à surveiller avec son ticker.
+3. Un secteur ou actif alternatif à surveiller.
+4. Les principaux risques.
+5. Un fun fact sur l'investissement.
 
-Quelle est la tendance economique dominante aujourd'hui dans le monde ?
+Sois concret et précis.
 
-Base-toi sur les actualites et les marches reels ci-dessus.
-
-BLOC 2 — ACTION A SURVEILLER
-4 lignes.
-
-Cite UNE action cotee en bourse precise avec son ticker.
-
-Exemples :
-TotalEnergies (TTE.PA)
-LVMH (MC.PA)
-Apple (AAPL)
-Airbus (AIR.PA)
-
-Explique pourquoi cette action est interessante AUJOURD'HUI specifiquement.
-
-BLOC 3 — SECTEUR OU ACTIF ALTERNATIF
-3 lignes.
-
-Un secteur ou actif supplementaire a surveiller :
-ETF, matieres premieres, obligations ou crypto.
-
-BLOC 4 — RISQUES A CONNAITRE
-3 lignes.
-
-Les 2 ou 3 risques concrets qui pourraient faire baisser ces investissements aujourd'hui.
-
-BLOC 5 — FUN FACT FINANCE
-2 lignes.
-
-Un fait surprenant sur les marches ou l'investissement.
-
-IMPORTANT :
-
-Cite des noms d'entreprises et tickers reels.
-
-Sois precis et concret.
+Maximum 220 mots.
 
 Termine par :
-Analyse pedagogique uniquement, pas un conseil financier professionnel.
+Analyse pédagogique uniquement, pas un conseil financier professionnel.""",
+        tokens=600
+    )
 
-Maximum 250 mots.
+except:
 
-IMPORTANT :
-Tu dois impérativement produire une réponse textuelle.""",
-    tokens=700
-)
+    invest = (
+        "L'analyse d'investissement n'a pas pu être générée "
+        "aujourd'hui."
+    )
+
 
 send(
     sep("💼 INVESTISSEMENT DU JOUR")
     + invest
 )
 
+
 # SYNTHESE
 
-synthese = groq_call(
-    f"""Date : {date_complete}
+try:
 
-Sujets du jour :
+    synthese = groq_call(
+        f"""Date : {date_complete}
+
+Actualités principales :
 
 {chr(10).join(titres_analyses)}
 
-Ecris une synthese de 5 lignes maximum.
+Fais une synthèse du monde aujourd'hui.
 
-Lecture transversale du monde aujourd'hui.
+Maximum 5 lignes.
 
-Termine par une phrase forte.
-
+Français uniquement.
 Sans Markdown.
 
-En FRANCAIS.
+Termine par une phrase forte.""",
+        tokens=250
+    )
 
-IMPORTANT :
-Tu dois impérativement produire une réponse textuelle.""",
-    tokens=300
-)
+except:
+
+    synthese = (
+        "La synthèse du jour n'a pas pu être générée."
+    )
+
 
 send(
     sep("📊 SYNTHESE DU JOUR")
     + synthese
     + f"\n\n{'═'*35}\n"
-    f"🗞 Fin du rapport — {date_complete}"
+      f"🗞 Fin du rapport — {date_complete}"
 )
