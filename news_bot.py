@@ -246,7 +246,7 @@ def get_crypto():
         response = requests.get(
             "https://api.coingecko.com/api/v3/simple/price"
             "?ids=bitcoin,ethereum,solana"
-            "&vs_currencies=usd"
+            "&vs_currencies=eur"
             "&include_24hr_change=true",
             timeout=10
         )
@@ -732,35 +732,35 @@ if crypto:
 
     btc_emoji = (
         "🟢"
-        if btc.get("usd_24h_change", 0) >= 0
+        if btc.get("eur_24h_change", 0) >= 0
         else "🔴"
     )
 
     eth_emoji = (
         "🟢"
-        if eth.get("usd_24h_change", 0) >= 0
+        if eth.get("eur_24h_change", 0) >= 0
         else "🔴"
     )
 
     sol_emoji = (
         "🟢"
-        if sol.get("usd_24h_change", 0) >= 0
+        if sol.get("eur_24h_change", 0) >= 0
         else "🔴"
     )
 
     crypto_message = (
 
         f"{btc_emoji} Bitcoin  : "
-        f"${btc.get('usd', 0):,.0f} "
-        f"({btc.get('usd_24h_change', 0):+.2f}%)\n"
+        f"€{btc.get('eur', 0):,.0f} "
+        f"({btc.get('eur_24h_change', 0):+.2f}%)\n"
 
         f"{eth_emoji} Ethereum : "
-        f"${eth.get('usd', 0):,.0f} "
-        f"({eth.get('usd_24h_change', 0):+.2f}%)\n"
+        f"€{eth.get('eur', 0):,.0f} "
+        f"({eth.get('eur_24h_change', 0):+.2f}%)\n"
 
         f"{sol_emoji} Solana   : "
-        f"${sol.get('usd', 0):,.0f} "
-        f"({sol.get('usd_24h_change', 0):+.2f}%)\n\n"
+        f"€{sol.get('eur', 0):,.0f} "
+        f"({sol.get('eur_24h_change', 0):+.2f}%)\n\n"
 
         "Source : CoinGecko"
     )
@@ -803,12 +803,12 @@ if crypto:
 
     crypto_text = (
         f"Bitcoin : "
-        f"${btc.get('usd', 0):,.0f} "
-        f"({btc.get('usd_24h_change', 0):+.2f}%)\n"
+        f"€{btc.get('eur', 0):,.0f} "
+        f"({btc.get('eur_24h_change', 0):+.2f}%)\n"
 
         f"Ethereum : "
-        f"${eth.get('usd', 0):,.0f} "
-        f"({eth.get('usd_24h_change', 0):+.2f}%)"
+        f"€{eth.get('eur', 0):,.0f} "
+        f"({eth.get('eur_24h_change', 0):+.2f}%)"
     )
 
 
