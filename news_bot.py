@@ -56,6 +56,19 @@ def sep(titre):
 # ============================================================
 # GROQ
 # ============================================================
+#
+# openai/gpt-oss-20b es un modelo "reasoning": antes de escribir la
+# respuesta final, gasta tokens "pensando" internamente. Esos tokens
+# de razonamiento cuentan dentro del mismo presupuesto que le pasamos
+# como límite de tokens de salida. Si el límite es demasiado bajo, el
+# modelo se queda sin tokens en pleno razonamiento y la respuesta
+# final sale vacía o cortada a la mitad.
+#
+# Para evitarlo:
+#  - reasoning_effort="low" reduce al mínimo ese "pensamiento" interno
+#  - max_completion_tokens (en vez del antiguo max_tokens) con margen
+#    generoso, para que siempre quede espacio de sobra para la
+#    respuesta final.
 
 def groq_call(prompt, tokens=700, retries=3):
 
@@ -76,7 +89,8 @@ def groq_call(prompt, tokens=700, retries=3):
                         "content": prompt
                     }
                 ],
-                max_tokens=tokens,
+                max_completion_tokens=tokens,
+                reasoning_effort="low",
                 temperature=0.4
             )
 
@@ -181,7 +195,7 @@ Maximum 100 mots.
 
         result = groq_call(
             prompt,
-            tokens=550,
+            tokens=900,
             retries=3
         )
 
@@ -205,7 +219,7 @@ Utilise uniquement les informations disponibles.
 Ne rien inventer.
 Aucun Markdown.
 """,
-            tokens=300,
+            tokens=500,
             retries=2
         )
 
@@ -526,7 +540,7 @@ try:
 
     selection = groq_call(
         selection_prompt,
-        tokens=500,
+        tokens=700,
         retries=3
     )
 
@@ -857,7 +871,7 @@ try:
 
     investment = groq_call(
         investment_prompt,
-        tokens=900,
+        tokens=1200,
         retries=3
     )
 
@@ -899,7 +913,7 @@ Maximum 100 mots.
 
 Ne donne aucun chiffre non fourni.
 """,
-            tokens=350,
+            tokens=500,
             retries=2
         )
 
@@ -943,7 +957,7 @@ try:
 
     summary = groq_call(
         summary_prompt,
-        tokens=400,
+        tokens=600,
         retries=3
     )
 
